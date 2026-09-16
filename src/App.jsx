@@ -84,6 +84,7 @@ export default function App() {
   const [running, setRunning] = useState(false)
   const [screen, setScreen] = useState('match')
   const [asking, setAsking] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [standalone] = useState(
     () =>
@@ -209,6 +210,16 @@ export default function App() {
     setAsking(false)
   }
 
+  const resetClock = () => {
+    setRunning(false)
+    setMatch((m) => {
+      const clocks = [...m.clocks]
+      clocks[m.period - 1] = 0
+      return { ...m, clocks }
+    })
+    setResetting(false)
+  }
+
   return (
     <div className="shell">
       <Scoreboard
@@ -257,21 +268,21 @@ export default function App() {
             </div>
             <div className="clock">
               <span className="clock-num">{mmss(clock)}</span>
-              <button className="btn" onClick={() => setRunning((r) => !r)}>
-                {running ? 'Pauze' : 'Start'}
+              <button
+                className="btn btn-icon"
+                onClick={() => setRunning((r) => !r)}
+                aria-label={running ? 'Pauze' : 'Start'}
+                title={running ? 'Pauze' : 'Start'}
+              >
+                {running ? <PauseIcon /> : <PlayIcon />}
               </button>
               <button
-                className="btn btn-quiet"
-                onClick={() => {
-                  setRunning(false)
-                  setMatch((m) => {
-                    const clocks = [...m.clocks]
-                    clocks[m.period - 1] = 0
-                    return { ...m, clocks }
-                  })
-                }}
+                className="btn btn-quiet btn-icon"
+                onClick={() => setResetting(true)}
+                aria-label="Terug op nul"
+                title="Terug op nul"
               >
-                Terug op nul
+                <ResetIcon />
               </button>
             </div>
           </section>
@@ -310,6 +321,15 @@ export default function App() {
           )}
 
           <div className="row">
+            <button
+              className="btn btn-quiet btn-icon"
+              onClick={undo}
+              disabled={!match.events.length}
+              aria-label="Laatste ongedaan maken"
+              title="Laatste ongedaan maken"
+            >
+              <UndoIcon />
+            </button>
             <button className="btn btn-wide" onClick={() => addGoal('us', null)}>
               Doelpunt zonder naam
             </button>
@@ -319,9 +339,6 @@ export default function App() {
           </div>
 
           <div className="row">
-            <button className="btn btn-quiet" onClick={undo} disabled={!match.events.length}>
-              Laatste ongedaan maken
-            </button>
             <button className="btn" onClick={() => setSharing(true)}>
               Samenvatting
             </button>
@@ -382,6 +399,16 @@ export default function App() {
           confirmLabel="Wissen en starten"
           onConfirm={newMatch}
           onCancel={() => setAsking(false)}
+        />
+      )}
+
+      {resetting && (
+        <Confirm
+          title="Klok terug op nul zetten?"
+          body={`De tijd van periode ${match.period} (${mmss(clock)}) gaat verloren.`}
+          confirmLabel="Terug op nul"
+          onConfirm={resetClock}
+          onCancel={() => setResetting(false)}
         />
       )}
     </div>
@@ -727,6 +754,68 @@ function ClaudeMark() {
       <path
         d="M10 1 L12.12 7.88 L19 10 L12.12 12.12 L10 19 L7.88 12.12 L1 10 L7.88 7.88 Z"
         fill="#cc785c"
+      />
+    </svg>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+      <path d="M6 4.5 L16 10 L6 15.5 Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function PauseIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+      <rect x="5" y="4" width="4" height="12" rx="1" fill="currentColor" />
+      <rect x="11" y="4" width="4" height="12" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+function ResetIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+      <path
+        d="M15.5 10a5.5 5.5 0 1 1-1.66-3.94"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M15.5 4.5v3.5h-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function UndoIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+      <path
+        d="M7 4 L3 8 L7 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3 8h8a5 5 0 0 1 0 10h-2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   )

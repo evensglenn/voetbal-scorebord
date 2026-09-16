@@ -205,6 +205,15 @@ body {
   flex: 1;
 }
 
+.btn-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  padding: 0.6rem 0;
+}
+
 .row {
   display: flex;
   flex-wrap: wrap;
