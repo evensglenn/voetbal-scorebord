@@ -47,7 +47,7 @@ function badge(ctx, text, x, y, fill = CLUB, color = INK) {
   return w
 }
 
-export function drawSummary(ctx, d) {
+export function drawSummary(ctx, d, logo) {
   ctx.save()
   ctx.scale(SCALE, SCALE)
 
@@ -99,6 +99,16 @@ export function drawSummary(ctx, d) {
 
   drawChart(ctx, d, 424)
   drawScorers(ctx, d, 880)
+
+  // Grijs en gedempt clublogo onderaan — een subtiele afzender, geen blikvanger.
+  if (logo) {
+    const logoSize = 40
+    ctx.save()
+    ctx.filter = 'grayscale(1)'
+    ctx.globalAlpha = 0.3
+    ctx.drawImage(logo, (DESIGN_W - logoSize) / 2, DESIGN_H - logoSize - 8, logoSize, logoSize)
+    ctx.restore()
+  }
 
   ctx.restore()
 }
@@ -246,4 +256,19 @@ function drawScorers(ctx, d, top) {
     ctx.lineTo(DESIGN_W - PAD, y + rowH * 0.33)
     ctx.stroke()
   })
+}
+
+// Laadt het clublogo één keer en hergebruikt daarna dezelfde Image, zodat
+// drawSummary() het synchroon met ctx.drawImage() kan tekenen.
+let logoPromise = null
+export function loadClubLogo() {
+  if (!logoPromise) {
+    logoPromise = new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => resolve(null)
+      img.src = `${import.meta.env.BASE_URL}club-logo.png`
+    })
+  }
+  return logoPromise
 }

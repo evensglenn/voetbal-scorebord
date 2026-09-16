@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { drawSummary, W as SHOT_W, H as SHOT_H } from './summary.js'
+import { drawSummary, loadClubLogo, W as SHOT_W, H as SHOT_H } from './summary.js'
 import { version as APP_VERSION } from '../package.json'
 
 const STORAGE_KEY = 'matchblad.v1'
@@ -7,6 +7,7 @@ const PERIODS = [1, 2, 3, 4]
 const PERIOD_SECONDS_BY_AGE = { U7: 10 * 60, U9: 15 * 60 }
 const TEAM = 'Lummen United'
 const OPPONENT = 'Tegenstander'
+const CLUB_LOGO = `${import.meta.env.BASE_URL}club-logo.png`
 
 const periodSecondsFor = (ageGroup) => PERIOD_SECONDS_BY_AGE[ageGroup] ?? PERIOD_SECONDS_BY_AGE.U9
 
@@ -290,35 +291,40 @@ export default function App() {
           <HattrickBanner live={runs.live} players={match.players} />
 
           <h2 className="section-title">Wie scoorde?</h2>
-          {match.players.length === 0 ? (
+          {match.players.length === 0 && (
             <p className="empty">
               Nog geen spelers. Voeg ze toe bij <strong>Spelers</strong> en tik hier daarna
               op de naam van de scorer.
             </p>
-          ) : (
-            <div className="grid">
-              {match.players.map((p) => {
-                const onARoll = runs.live?.playerId === p.id ? runs.live.len : 0
-                return (
-                  <button
-                    key={p.id}
-                    className={onARoll >= 3 ? 'scorer is-hat' : 'scorer'}
-                    onClick={() => addGoal('us', p.id)}
-                  >
-                    {p.number !== '' && <span className="shirt">{p.number}</span>}
-                    <span className="scorer-name">{p.name}</span>
-                    {runs.hattricks[p.id] > 0 && (
-                      <span className="hats" title="Hattricks deze match">
-                        {'•'.repeat(Math.min(runs.hattricks[p.id], 3))}
-                      </span>
-                    )}
-                    {onARoll === 2 && <span className="streak">2 op rij</span>}
-                    {goalsBy[p.id] > 0 && <span className="tally">{goalsBy[p.id]}</span>}
-                  </button>
-                )
-              })}
-            </div>
           )}
+          <div className="grid">
+            {match.players.map((p) => {
+              const onARoll = runs.live?.playerId === p.id ? runs.live.len : 0
+              return (
+                <button
+                  key={p.id}
+                  className={onARoll >= 3 ? 'scorer is-hat' : 'scorer'}
+                  onClick={() => addGoal('us', p.id)}
+                >
+                  {p.number !== '' && <span className="shirt">{p.number}</span>}
+                  <span className="scorer-name">{p.name}</span>
+                  {runs.hattricks[p.id] > 0 && (
+                    <span className="hats" title="Hattricks deze match">
+                      {'•'.repeat(Math.min(runs.hattricks[p.id], 3))}
+                    </span>
+                  )}
+                  {onARoll === 2 && <span className="streak">2 op rij</span>}
+                  {goalsBy[p.id] > 0 && <span className="tally">{goalsBy[p.id]}</span>}
+                </button>
+              )
+            })}
+            <button className="scorer scorer-neutral" onClick={() => addGoal('us', null)}>
+              Zonder naam
+            </button>
+            <button className="scorer scorer-away" onClick={() => addGoal('them')}>
+              Tegendoelpunt
+            </button>
+          </div>
 
           <div className="row">
             <button
@@ -329,12 +335,6 @@ export default function App() {
               title="Laatste ongedaan maken"
             >
               <UndoIcon />
-            </button>
-            <button className="btn btn-wide" onClick={() => addGoal('us', null)}>
-              Doelpunt zonder naam
-            </button>
-            <button className="btn btn-away btn-wide" onClick={() => addGoal('them')}>
-              Tegendoelpunt
             </button>
           </div>
 
@@ -383,11 +383,8 @@ export default function App() {
       )}
 
       <footer className="foot">
+        <img className="foot-logo" src={CLUB_LOGO} alt="" />
         <p>v{APP_VERSION}</p>
-        <p className="built-with">
-          <ClaudeMark />
-          Gebouwd met de hulp van Claude
-        </p>
       </footer>
 
       {sharing && <Summary data={summary} onClose={() => setSharing(false)} />}
@@ -429,10 +426,11 @@ function Summary({ data, onClose }) {
       } catch {
         // zonder het webfont tekent het canvas met de systeemletter
       }
+      const logo = await loadClubLogo()
       const canvas = document.createElement('canvas')
       canvas.width = SHOT_W
       canvas.height = SHOT_H
-      drawSummary(canvas.getContext('2d'), data)
+      drawSummary(canvas.getContext('2d'), data, logo)
       canvas.toBlob((blob) => {
         if (stale) return
         if (!blob) {
@@ -440,7 +438,7 @@ function Summary({ data, onClose }) {
           return
         }
         setUrl(URL.createObjectURL(blob))
-        setFile(new File([blob], 'matchblad.png', { type: 'image/png' }))
+        setFile(new File([blob], 'scorebord.png', { type: 'image/png' }))
       }, 'image/png')
     }
 
@@ -462,7 +460,7 @@ function Summary({ data, onClose }) {
 
   const share = async () => {
     try {
-      await navigator.share({ files: [file], title: 'Matchblad' })
+      await navigator.share({ files: [file], title: 'Scorebord' })
     } catch {
       // gedeeld venster weggeklikt: niets aan de hand
     }
@@ -471,7 +469,7 @@ function Summary({ data, onClose }) {
   const save = () => {
     const link = document.createElement('a')
     link.href = url
-    link.download = `matchblad-${new Date().toISOString().slice(0, 10)}.png`
+    link.download = `scorebord-${new Date().toISOString().slice(0, 10)}.png`
     link.click()
   }
 
@@ -745,17 +743,6 @@ function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
         </ul>
       )}
     </section>
-  )
-}
-
-function ClaudeMark() {
-  return (
-    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false">
-      <path
-        d="M10 1 L12.12 7.88 L19 10 L12.12 12.12 L10 19 L7.88 12.12 L1 10 L7.88 7.88 Z"
-        fill="#cc785c"
-      />
-    </svg>
   )
 }
 

@@ -317,6 +317,28 @@ input:focus-visible {
   color: var(--paper);
 }
 
+.scorer-neutral {
+  border-left-color: var(--away);
+}
+
+.scorer-neutral:active {
+  background: var(--away);
+  border-color: var(--away);
+  color: var(--paper);
+}
+
+.scorer-away {
+  justify-content: center;
+  background: var(--away);
+  border-color: var(--away);
+  color: var(--paper);
+}
+
+.scorer-away:active {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
 .scorer-name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -459,17 +481,14 @@ input:focus-visible {
   margin: 0;
 }
 
-.foot .built-with {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  margin-top: 0.3rem;
-  font-size: 0.7rem;
-}
-
-.built-with svg {
-  flex: 0 0 auto;
+.foot-logo {
+  display: block;
+  width: 5.5rem;
+  height: 5.5rem;
+  object-fit: contain;
+  margin: 0 auto 0.5rem;
+  filter: grayscale(1);
+  opacity: 0.3;
 }
 
 @media (min-width: 30rem) {
