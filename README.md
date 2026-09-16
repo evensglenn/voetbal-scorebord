@@ -1,4 +1,4 @@
-# Voetbal scorebord
+# Matchblad
 
 Score, doelpuntenmakers en tijdslijn bijhouden tijdens een U9-match (5 tegen 5, 4 × 15 minuten).
 Draait volledig in de browser en bewaart alles lokaal op het toestel — geen server, geen account.
@@ -35,3 +35,31 @@ base automatisch `/`.
 - **Laatste ongedaan maken** haalt een misklik weg; in de tijdslijn kan elk doelpunt apart
   met × verwijderd worden.
 - **Nieuwe match** wist score en tijdslijn, de spelerslijst blijft staan.
+
+## Op je gsm zetten
+
+Open de gepubliceerde link op je telefoon en zet ze op het beginscherm: op iPhone via
+**Deel → Zet op beginscherm**, op Android via **menu → App installeren**. Daarna opent het
+matchblad in volledig scherm, zonder adresbalk, met het voetbalicoon erbij.
+
+De service worker in `public/sw.js` cachet de app, dus ze opent ook als er langs het veld
+geen bereik is. Dat werkt enkel over https — op GitHub Pages dus wel, op een gewone
+`http://`-testserver niet. Het lettertype komt van Google Fonts en valt zonder netwerk
+terug op de systeemletter.
+
+De iconen staan in `public/` en zijn gemaakt met `tools/make_icons.py`. Wil je een andere
+clubkleur, pas dan `CLUB` in dat script aan en draai het opnieuw:
+
+```bash
+python3 tools/make_icons.py
+```
+
+## Hattricks
+
+Drie doelpunten na elkaar van dezelfde speler tellen als hattrick. Elk doelpunt daartussen
+breekt de reeks: van een ploegmaat, van de tegenstander, of een doelpunt zonder naam.
+
+Je ziet het op drie plaatsen: een oranje balk bovenaan zodra het zover is, een dikke oranje
+rand langs de betrokken doelpunten in de tijdslijn met het label erbij, en een teller per
+speler in de spelerslijst. Staat iemand op twee op rij, dan verschijnt dat al op zijn knop.
+Loopt de reeks door tot vier of vijf, dan telt het label mee.
