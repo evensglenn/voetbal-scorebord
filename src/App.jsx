@@ -178,6 +178,7 @@ export default function App() {
 
       {screen === 'match' ? (
         <>
+          <div className="pane pane-play">
           <section className="clockbar">
             <div className="periods">
               {PERIODS.map((p) => (
@@ -263,7 +264,11 @@ export default function App() {
             </button>
           </div>
 
-          <Timeline match={match} runs={runs} onRemove={removeEvent} />
+          </div>
+
+          <div className="pane pane-log">
+            <Timeline match={match} runs={runs} onRemove={removeEvent} />
+          </div>
         </>
       ) : (
         <Squad
@@ -506,7 +511,7 @@ function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
   }
 
   return (
-    <section>
+    <section className="pane-squad">
       <h2 className="section-title">Spelers</h2>
       <div className="row">
         <input
