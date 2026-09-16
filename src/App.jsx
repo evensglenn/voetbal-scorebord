@@ -28,6 +28,46 @@ function load() {
 
 const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
+// Een hattrick is drie doelpunten na elkaar van dezelfde speler. Elk ander doelpunt
+// breekt de reeks: van een ploegmaat, van de tegenstander, of een doelpunt zonder naam.
+function analyseRuns(events) {
+  const n = events.length
+  const lens = new Array(n).fill(0)
+  let prev = null
+
+  events.forEach((e, i) => {
+    if (e.team === 'us' && e.playerId) {
+      lens[i] = e.playerId === prev ? lens[i - 1] + 1 : 1
+      prev = e.playerId
+    } else {
+      lens[i] = 0
+      prev = null
+    }
+  })
+
+  // Terugwaarts bepalen hoe lang de reeks wordt waar dit doelpunt bij hoort.
+  const inHattrick = new Array(n).fill(false)
+  let runMax = 0
+  for (let i = n - 1; i >= 0; i--) {
+    const continues = i + 1 < n && lens[i] > 0 && lens[i + 1] === lens[i] + 1
+    runMax = continues ? runMax : lens[i]
+    inHattrick[i] = lens[i] > 0 && runMax >= 3
+  }
+
+  const streak = {}
+  const hat = {}
+  const hattricks = {}
+  events.forEach((e, i) => {
+    streak[e.id] = lens[i]
+    hat[e.id] = inHattrick[i]
+    if (lens[i] === 3) hattricks[e.playerId] = (hattricks[e.playerId] ?? 0) + 1
+  })
+
+  const last = n > 0 && lens[n - 1] > 0 ? { playerId: events[n - 1].playerId, len: lens[n - 1] } : null
+
+  return { streak, hat, hattricks, live: last }
+}
+
 export default function App() {
   const [match, setMatch] = useState(load)
   const [running, setRunning] = useState(false)
@@ -72,6 +112,8 @@ export default function App() {
     }
     return map
   }, [match.events])
+
+  const runs = useMemo(() => analyseRuns(match.events), [match.events])
 
   const addGoal = (team, playerId = null) =>
     setMatch((m) => ({
@@ -165,6 +207,8 @@ export default function App() {
             </div>
           </section>
 
+          <HattrickBanner live={runs.live} players={match.players} />
+
           <h2 className="section-title">Wie scoorde?</h2>
           {match.players.length === 0 ? (
             <p className="empty">
@@ -173,13 +217,26 @@ export default function App() {
             </p>
           ) : (
             <div className="grid">
-              {match.players.map((p) => (
-                <button key={p.id} className="scorer" onClick={() => addGoal('us', p.id)}>
-                  {p.number !== '' && <span className="shirt">{p.number}</span>}
-                  <span className="scorer-name">{p.name}</span>
-                  {goalsBy[p.id] > 0 && <span className="tally">{goalsBy[p.id]}</span>}
-                </button>
-              ))}
+              {match.players.map((p) => {
+                const onARoll = runs.live?.playerId === p.id ? runs.live.len : 0
+                return (
+                  <button
+                    key={p.id}
+                    className={onARoll >= 3 ? 'scorer is-hat' : 'scorer'}
+                    onClick={() => addGoal('us', p.id)}
+                  >
+                    {p.number !== '' && <span className="shirt">{p.number}</span>}
+                    <span className="scorer-name">{p.name}</span>
+                    {runs.hattricks[p.id] > 0 && (
+                      <span className="hats" title="Hattricks deze match">
+                        {'•'.repeat(Math.min(runs.hattricks[p.id], 3))}
+                      </span>
+                    )}
+                    {onARoll === 2 && <span className="streak">2 op rij</span>}
+                    {goalsBy[p.id] > 0 && <span className="tally">{goalsBy[p.id]}</span>}
+                  </button>
+                )
+              })}
             </div>
           )}
 
@@ -201,12 +258,13 @@ export default function App() {
             </button>
           </div>
 
-          <Timeline match={match} onRemove={removeEvent} />
+          <Timeline match={match} runs={runs} onRemove={removeEvent} />
         </>
       ) : (
         <Squad
           players={match.players}
           goalsBy={goalsBy}
+          hattricks={runs.hattricks}
           onAdd={(player) =>
             setMatch((m) => ({ ...m, players: [...m.players, { id: uid(), ...player }] }))
           }
@@ -226,6 +284,20 @@ export default function App() {
         Alles blijft op dit toestel bewaard. 4 × 15 minuten, 5 tegen 5.
       </footer>
     </div>
+  )
+}
+
+function HattrickBanner({ live, players }) {
+  if (!live || live.len < 3) return null
+  const name = players.find((p) => p.id === live.playerId)?.name ?? 'Onbekende speler'
+
+  return (
+    <p className="banner" role="status">
+      <span className="banner-what">
+        {live.len === 3 ? 'Hattrick' : `${live.len} op rij`}
+      </span>
+      <span className="banner-who">{name}</span>
+    </p>
   )
 }
 
@@ -273,7 +345,7 @@ function Scoreboard({ home, score, onVenue }) {
   )
 }
 
-function Timeline({ match, onRemove }) {
+function Timeline({ match, runs, onRemove }) {
   if (match.events.length === 0) {
     return (
       <>
@@ -304,24 +376,35 @@ function Timeline({ match, onRemove }) {
                 Periode {p}
                 {inPeriod.length === 0 && <span className="tl-none">geen doelpunten</span>}
               </h3>
-              {inPeriod.map((r) => (
-                <div key={r.id} className={r.team === 'us' ? 'tl-row' : 'tl-row is-away'}>
-                  <span className="tl-score">
-                    {r.us}–{r.them}
-                  </span>
-                  <span className="tl-who">
-                    {r.team === 'us' ? (r.name ?? 'Doelpunt') : OPPONENT}
-                    {r.clock ? <span className="tl-min"> {mmss(r.clock)}</span> : null}
-                  </span>
-                  <button
-                    className="tl-del"
-                    onClick={() => onRemove(r.id)}
-                    aria-label="Dit doelpunt verwijderen"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+              {inPeriod.map((r) => {
+                const len = runs.streak[r.id]
+                const inHat = runs.hat[r.id]
+                const classes = ['tl-row']
+                if (r.team !== 'us') classes.push('is-away')
+                if (inHat) classes.push('is-hat')
+                if (inHat && len === 1) classes.push('is-hat-start')
+                return (
+                  <div key={r.id} className={classes.join(' ')}>
+                    <span className="tl-score">
+                      {r.us}–{r.them}
+                    </span>
+                    <span className="tl-who">
+                      {r.team === 'us' ? (r.name ?? 'Doelpunt') : OPPONENT}
+                      {r.clock ? <span className="tl-min"> {mmss(r.clock)}</span> : null}
+                    </span>
+                    {inHat && len >= 3 && (
+                      <span className="tl-hat">{len === 3 ? 'hattrick' : `${len} op rij`}</span>
+                    )}
+                    <button
+                      className="tl-del"
+                      onClick={() => onRemove(r.id)}
+                      aria-label="Dit doelpunt verwijderen"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
             </li>
           )
         })}
@@ -330,7 +413,7 @@ function Timeline({ match, onRemove }) {
   )
 }
 
-function Squad({ players, goalsBy, onAdd, onRemove }) {
+function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
   const [name, setName] = useState('')
   const [number, setNumber] = useState('')
 
@@ -376,6 +459,11 @@ function Squad({ players, goalsBy, onAdd, onRemove }) {
               <span className="squad-name">{p.name}</span>
               <span className="squad-goals">
                 {goalsBy[p.id] ? `${goalsBy[p.id]}×` : ''}
+                {hattricks[p.id] > 0 && (
+                  <span className="squad-hat">
+                    {hattricks[p.id] === 1 ? 'hattrick' : `${hattricks[p.id]} hattricks`}
+                  </span>
+                )}
               </span>
               <button
                 className="btn btn-quiet"
