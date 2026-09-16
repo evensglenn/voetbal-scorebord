@@ -1,4 +1,4 @@
-# Voetbal scorebord
+# Matchblad
 
 Score, doelpuntenmakers en tijdslijn bijhouden tijdens een U9-match (5 tegen 5, 4 × 15 minuten).
 Draait volledig in de browser en bewaart alles lokaal op het toestel — geen server, geen account.
@@ -35,3 +35,13 @@ base automatisch `/`.
 - **Laatste ongedaan maken** haalt een misklik weg; in de tijdslijn kan elk doelpunt apart
   met × verwijderd worden.
 - **Nieuwe match** wist score en tijdslijn, de spelerslijst blijft staan.
+
+## Hattricks
+
+Drie doelpunten na elkaar van dezelfde speler tellen als hattrick. Elk doelpunt daartussen
+breekt de reeks: van een ploegmaat, van de tegenstander, of een doelpunt zonder naam.
+
+Je ziet het op drie plaatsen: een oranje balk bovenaan zodra het zover is, een dikke oranje
+rand langs de betrokken doelpunten in de tijdslijn met het label erbij, en een teller per
+speler in de spelerslijst. Staat iemand op twee op rij, dan verschijnt dat al op zijn knop.
+Loopt de reeks door tot vier of vijf, dan telt het label mee.
