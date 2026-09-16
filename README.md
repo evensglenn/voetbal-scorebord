@@ -54,6 +54,12 @@ clubkleur, pas dan `CLUB` in dat script aan en draai het opnieuw:
 python3 tools/make_icons.py
 ```
 
+## Liggend scherm
+
+Draai je de telefoon, dan komt de tijdslijn naast de spelersknoppen te staan en blijft het
+scorebord bovenaan hangen. Het manifest legt geen oriëntatie meer vast, dus ook als app op
+je beginscherm draait hij gewoon mee.
+
 ## Hattricks
 
 Drie doelpunten na elkaar van dezelfde speler tellen als hattrick. Elk doelpunt daartussen
