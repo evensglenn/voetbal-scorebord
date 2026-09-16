@@ -82,11 +82,6 @@ export function drawSummary(ctx, d) {
 
   drawChart(ctx, d, 424)
   drawScorers(ctx, d, 880)
-
-  ctx.fillStyle = FADED
-  ctx.font = font(500, 26)
-  ctx.textAlign = 'center'
-  ctx.fillText('5 tegen 5 · 4 × 15 minuten', W / 2, H - 56)
 }
 
 function drawChart(ctx, d, top) {
@@ -187,13 +182,21 @@ function drawScorers(ctx, d, top) {
     return
   }
 
-  // Bij meer dan vijf scorers houden we een regel vrij voor de rest.
-  const rows = d.scorers.slice(0, d.scorers.length > 5 ? 4 : 5)
+  // Iedereen die scoorde krijgt een regel; bij veel scorers krimpt de rijhoogte
+  // zodat de lijst binnen het vaste canvasformaat blijft passen.
+  const rows = d.scorers
+  const listTop = top + 66
+  const available = H - 40 - listTop
+  const rowH = Math.min(66, Math.max(30, available / rows.length))
+  const nameSize = rowH >= 58 ? 42 : rowH >= 48 ? 36 : rowH >= 40 ? 30 : 24
+  const dotR = rowH >= 58 ? 12 : rowH >= 48 ? 10 : rowH >= 40 ? 8 : 6
+  const dotGap = dotR * 2 + 10
+
   rows.forEach((s, i) => {
-    const y = top + 66 + i * 66
+    const y = listTop + i * rowH
 
     ctx.fillStyle = PAPER
-    ctx.font = font(i === 0 ? 700 : 500, 42)
+    ctx.font = font(i === 0 ? 700 : 500, nameSize)
     ctx.textAlign = 'left'
     ctx.fillText(s.name, PAD, y)
 
@@ -207,33 +210,21 @@ function drawScorers(ctx, d, top) {
     for (let k = 0; k < dots; k++) {
       ctx.fillStyle = CLUB
       ctx.beginPath()
-      ctx.arc(W - PAD - 34 - k * 34, y - 13, 12, 0, Math.PI * 2)
+      ctx.arc(W - PAD - dotGap / 2 - k * dotGap, y - rowH * 0.2, dotR, 0, Math.PI * 2)
       ctx.fill()
     }
     if (s.goals > 8) {
       ctx.fillStyle = CLUB
-      ctx.font = font(600, 32)
+      ctx.font = font(600, Math.max(22, nameSize - 10))
       ctx.textAlign = 'right'
-      ctx.fillText(`${s.goals}`, W - PAD - 34 - 8 * 34, y - 2)
+      ctx.fillText(`${s.goals}`, W - PAD - dotGap / 2 - 8 * dotGap, y - 2)
     }
 
     ctx.strokeStyle = HAIR
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(PAD, y + 22)
-    ctx.lineTo(W - PAD, y + 22)
+    ctx.moveTo(PAD, y + rowH * 0.33)
+    ctx.lineTo(W - PAD, y + rowH * 0.33)
     ctx.stroke()
   })
-
-  const rest = d.scorers.length - rows.length
-  if (rest > 0) {
-    ctx.fillStyle = FADED
-    ctx.font = font(500, 30)
-    ctx.textAlign = 'left'
-    ctx.fillText(
-      rest === 1 ? 'en nog één speler' : `en nog ${rest} spelers`,
-      PAD,
-      top + 66 + rows.length * 66,
-    )
-  }
 }

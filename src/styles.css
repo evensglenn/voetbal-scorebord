@@ -71,42 +71,6 @@ body {
   color: var(--club);
 }
 
-.venue {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.4rem;
-}
-
-.venue-label {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.venue-switch {
-  display: flex;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.venue-btn {
-  padding: 0.25rem 0.7rem;
-  background: none;
-  border: 0;
-  font: inherit;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-}
-
-.venue-btn.is-on {
-  background: var(--club);
-  color: var(--paper);
-  font-weight: 600;
-}
-
 .dash {
   align-self: end;
   font-size: 2.6rem;
@@ -247,6 +211,20 @@ body {
 
 .field-num {
   flex: 0 0 4rem;
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem 0;
+}
+
+.choice-label {
+  font-size: 0.95rem;
+  color: var(--muted);
 }
 
 button:focus-visible,
@@ -426,15 +404,15 @@ input:focus-visible {
 }
 
 .foot {
-  margin: 2rem 1rem 0;
-  font-size: 0.85rem;
+  margin: 1.5rem 1rem 0;
+  font-size: 0.75rem;
   line-height: 1.45;
+  text-align: center;
   color: var(--muted);
 }
 
 .foot p {
-  margin: 0 0 0.5rem;
-  max-width: 34ch;
+  margin: 0;
 }
 
 @media (min-width: 30rem) {

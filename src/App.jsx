@@ -3,14 +3,18 @@ import { drawSummary, W as SHOT_W, H as SHOT_H } from './summary.js'
 
 const STORAGE_KEY = 'matchblad.v1'
 const PERIODS = [1, 2, 3, 4]
-const PERIOD_SECONDS = 15 * 60
+const PERIOD_SECONDS_BY_AGE = { U7: 10 * 60, U9: 15 * 60 }
 const TEAM = 'Lummen United'
 const OPPONENT = 'Tegenstander'
+
+const periodSecondsFor = (ageGroup) => PERIOD_SECONDS_BY_AGE[ageGroup] ?? PERIOD_SECONDS_BY_AGE.U9
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 
 const emptyMatch = () => ({
   home: true,
+  opponent: '',
+  ageGroup: 'U9',
   players: [],
   events: [],
   period: 1,
@@ -95,7 +99,7 @@ export default function App() {
     tick.current = setInterval(() => {
       setMatch((m) => {
         const clocks = [...m.clocks]
-        clocks[m.period - 1] = Math.min(PERIOD_SECONDS, clocks[m.period - 1] + 1)
+        clocks[m.period - 1] = Math.min(periodSecondsFor(m.ageGroup), clocks[m.period - 1] + 1)
         return { ...m, clocks }
       })
     }, 1000)
@@ -103,9 +107,12 @@ export default function App() {
   }, [running])
 
   const clock = match.clocks[match.period - 1]
+  const periodSeconds = periodSecondsFor(match.ageGroup)
   useEffect(() => {
-    if (clock >= PERIOD_SECONDS) setRunning(false)
-  }, [clock])
+    if (clock >= periodSeconds) setRunning(false)
+  }, [clock, periodSeconds])
+
+  const opponentName = match.opponent?.trim() || OPPONENT
 
   const score = useMemo(() => {
     const us = match.events.filter((e) => e.team === 'us').length
@@ -125,7 +132,7 @@ export default function App() {
 
   const summary = useMemo(() => {
     const ours = { name: TEAM, goals: score.us, ours: true }
-    const theirs = { name: OPPONENT, goals: score.them, ours: false }
+    const theirs = { name: opponentName, goals: score.them, ours: false }
     const [left, right] = match.home ? [ours, theirs] : [theirs, ours]
 
     let us = 0
@@ -155,13 +162,13 @@ export default function App() {
         year: 'numeric',
       }),
       ourName: TEAM,
-      theirName: OPPONENT,
+      theirName: opponentName,
       left,
       right,
       events,
       scorers,
     }
-  }, [match, score, goalsBy, runs])
+  }, [match, score, goalsBy, runs, opponentName])
 
   const addGoal = (team, playerId = null) =>
     setMatch((m) => ({
@@ -197,11 +204,7 @@ export default function App() {
 
   return (
     <div className="shell">
-      <Scoreboard
-        home={match.home}
-        score={score}
-        onVenue={(home) => setMatch((m) => ({ ...m, home }))}
-      />
+      <Scoreboard home={match.home} score={score} opponentName={opponentName} />
 
       <nav className="tabs">
         <button
@@ -215,6 +218,12 @@ export default function App() {
           onClick={() => setScreen('squad')}
         >
           Spelers
+        </button>
+        <button
+          className={screen === 'wedstrijd' ? 'tab is-on' : 'tab'}
+          onClick={() => setScreen('wedstrijd')}
+        >
+          Wedstrijd
         </button>
       </nav>
 
@@ -312,10 +321,10 @@ export default function App() {
           </div>
 
           <div className="pane pane-log">
-            <Timeline match={match} runs={runs} onRemove={removeEvent} />
+            <Timeline match={match} runs={runs} opponentName={opponentName} onRemove={removeEvent} />
           </div>
         </>
-      ) : (
+      ) : screen === 'squad' ? (
         <Squad
           players={match.players}
           goalsBy={goalsBy}
@@ -333,16 +342,19 @@ export default function App() {
             }))
           }
         />
+      ) : (
+        <Wedstrijd
+          opponent={match.opponent}
+          onOpponentChange={(opponent) => setMatch((m) => ({ ...m, opponent }))}
+          home={match.home}
+          onVenueChange={(home) => setMatch((m) => ({ ...m, home }))}
+          ageGroup={match.ageGroup}
+          onAgeGroupChange={(ageGroup) => setMatch((m) => ({ ...m, ageGroup }))}
+        />
       )}
 
       <footer className="foot">
-        <p>Alles blijft op dit toestel bewaard. 4 × 15 minuten, 5 tegen 5.</p>
-        {!standalone && (
-          <p>
-            Zet het matchblad op je beginscherm en het opent zonder browserbalk: op iPhone
-            via Deel → Zet op beginscherm, op Android via het menu → App installeren.
-          </p>
-        )}
+        <p>v0.1.0</p>
       </footer>
 
       {sharing && <Summary data={summary} onClose={() => setSharing(false)} />}
@@ -531,9 +543,9 @@ function HattrickBanner({ live, players }) {
   )
 }
 
-function Scoreboard({ home, score, onVenue }) {
+function Scoreboard({ home, score, opponentName }) {
   const ours = { name: TEAM, goals: score.us, ours: true }
-  const theirs = { name: OPPONENT, goals: score.them, ours: false }
+  const theirs = { name: opponentName, goals: score.them, ours: false }
   const [left, right] = home ? [ours, theirs] : [theirs, ours]
 
   return (
@@ -551,31 +563,11 @@ function Scoreboard({ home, score, onVenue }) {
           <span className={right.ours ? 'goals goals-ours' : 'goals'}>{right.goals}</span>
         </div>
       </div>
-
-      <div className="venue">
-        <span className="venue-label">{TEAM} speelt</span>
-        <div className="venue-switch">
-          <button
-            className={home ? 'venue-btn is-on' : 'venue-btn'}
-            onClick={() => onVenue(true)}
-            aria-pressed={home}
-          >
-            thuis
-          </button>
-          <button
-            className={home ? 'venue-btn' : 'venue-btn is-on'}
-            onClick={() => onVenue(false)}
-            aria-pressed={!home}
-          >
-            uit
-          </button>
-        </div>
-      </div>
     </header>
   )
 }
 
-function Timeline({ match, runs, onRemove }) {
+function Timeline({ match, runs, opponentName, onRemove }) {
   if (match.events.length === 0) {
     return (
       <>
@@ -619,7 +611,7 @@ function Timeline({ match, runs, onRemove }) {
                       {r.us}–{r.them}
                     </span>
                     <span className="tl-who">
-                      {r.team === 'us' ? (r.name ?? 'Doelpunt') : OPPONENT}
+                      {r.team === 'us' ? (r.name ?? 'Doelpunt') : opponentName}
                       {r.clock ? <span className="tl-min"> {mmss(r.clock)}</span> : null}
                     </span>
                     {inHat && len >= 3 && (
@@ -706,6 +698,69 @@ function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
           ))}
         </ul>
       )}
+    </section>
+  )
+}
+
+function Wedstrijd({ opponent, onOpponentChange, home, onVenueChange, ageGroup, onAgeGroupChange }) {
+  return (
+    <section className="pane-squad">
+      <h2 className="section-title">Wedstrijd</h2>
+
+      <div className="row">
+        <input
+          className="field"
+          value={opponent}
+          onChange={(e) => onOpponentChange(e.target.value)}
+          placeholder={OPPONENT}
+          aria-label="Naam tegenstander"
+        />
+      </div>
+
+      <div className="choice-row">
+        <span className="choice-label">{TEAM} speelt</span>
+        <div className="periods">
+          <button
+            className={home ? 'per is-on' : 'per'}
+            onClick={() => onVenueChange(true)}
+            aria-pressed={home}
+          >
+            Thuis
+          </button>
+          <button
+            className={home ? 'per' : 'per is-on'}
+            onClick={() => onVenueChange(false)}
+            aria-pressed={!home}
+          >
+            Uit
+          </button>
+        </div>
+      </div>
+
+      <div className="choice-row">
+        <span className="choice-label">Leeftijdscategorie</span>
+        <div className="periods">
+          <button
+            className={ageGroup === 'U7' ? 'per is-on' : 'per'}
+            onClick={() => onAgeGroupChange('U7')}
+            aria-pressed={ageGroup === 'U7'}
+          >
+            U7 · 4×10&apos;
+          </button>
+          <button
+            className={ageGroup === 'U9' ? 'per is-on' : 'per'}
+            onClick={() => onAgeGroupChange('U9')}
+            aria-pressed={ageGroup === 'U9'}
+          >
+            U9 · 4×15&apos;
+          </button>
+        </div>
+      </div>
+
+      <p className="empty">
+        De naam van de tegenstander verschijnt op het scorebord en in de samenvatting. De
+        leeftijdscategorie bepaalt de duur van elke periode.
+      </p>
     </section>
   )
 }
