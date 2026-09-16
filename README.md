@@ -54,6 +54,17 @@ clubkleur, pas dan `CLUB` in dat script aan en draai het opnieuw:
 python3 tools/make_icons.py
 ```
 
+## Samenvatting als foto
+
+De knop **Samenvatting** tekent de match op een canvas van 1080 × 1350 en toont het
+resultaat in een venster. Op een telefoon verschijnt **Delen**, wat het deelvenster van het
+toestel opent (WhatsApp, Foto's, …); waar dat niet kan, staat er **Bewaren** en wordt de
+PNG gedownload.
+
+Op de afbeelding staan de uitslag, een verloopgrafiek met de vier periodes, en de
+doelpuntenmakers met een bolletje per goal en een label bij een hattrick. De tekenlogica
+staat apart in `src/summary.js`.
+
 ## Liggend scherm
 
 Draai je de telefoon, dan komt de tijdslijn naast de spelersknoppen te staan en blijft het
