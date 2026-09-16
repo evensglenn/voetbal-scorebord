@@ -686,3 +686,22 @@ input:focus-visible {
     margin-top: 1.2rem;
   }
 }
+
+/* Samenvatting */
+.dialog {
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+.dialog-wide {
+  max-width: 24rem;
+}
+
+.shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 1rem;
+  border-radius: var(--radius);
+  background: var(--ink);
+}
