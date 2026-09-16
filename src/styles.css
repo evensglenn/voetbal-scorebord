@@ -450,6 +450,19 @@ input:focus-visible {
   margin: 0;
 }
 
+.foot .built-with {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+}
+
+.built-with svg {
+  flex: 0 0 auto;
+}
+
 @media (min-width: 30rem) {
   .grid {
     grid-template-columns: repeat(3, 1fr);

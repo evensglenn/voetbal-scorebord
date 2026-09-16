@@ -169,6 +169,7 @@ export default function App() {
       }),
       ourName: TEAM,
       theirName: opponentName,
+      ageGroup: match.ageGroup,
       left,
       right,
       events,
@@ -366,6 +367,10 @@ export default function App() {
 
       <footer className="foot">
         <p>v{APP_VERSION}</p>
+        <p className="built-with">
+          <ClaudeMark />
+          Gebouwd met de hulp van Claude
+        </p>
       </footer>
 
       {sharing && <Summary data={summary} onClose={() => setSharing(false)} />}
@@ -713,6 +718,17 @@ function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
         </ul>
       )}
     </section>
+  )
+}
+
+function ClaudeMark() {
+  return (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false">
+      <path
+        d="M10 1 L12.12 7.88 L19 10 L12.12 12.12 L10 19 L7.88 12.12 L1 10 L7.88 7.88 Z"
+        fill="#cc785c"
+      />
+    </svg>
   )
 }
 

@@ -1,8 +1,15 @@
-// Tekent de samenvatting van de match als één afbeelding van 1080 × 1350,
+// Tekent de samenvatting van de match als één afbeelding met een 4:5-verhouding,
 // het formaat dat in WhatsApp en op Instagram volledig getoond wordt.
+// Er wordt getekend op een vast "ontwerp"-raster van DESIGN_W × DESIGN_H, dat via
+// ctx.scale() uitvergroot wordt naar de werkelijke canvasgrootte (W × H) — zo blijft
+// de afbeelding scherp op een groter scherm zonder dat elk getal in dit bestand
+// herrekend moet worden.
+const DESIGN_W = 1080
+const DESIGN_H = 1350
+const SCALE = 4 / 3
 
-export const W = 1080
-export const H = 1350
+export const W = Math.round(DESIGN_W * SCALE)
+export const H = Math.round(DESIGN_H * SCALE)
 
 const INK = '#11161b'
 const PAPER = '#ffffff'
@@ -41,8 +48,11 @@ function badge(ctx, text, x, y, fill = CLUB, color = INK) {
 }
 
 export function drawSummary(ctx, d) {
+  ctx.save()
+  ctx.scale(SCALE, SCALE)
+
   ctx.fillStyle = INK
-  ctx.fillRect(0, 0, W, H)
+  ctx.fillRect(0, 0, DESIGN_W, DESIGN_H)
   ctx.textBaseline = 'alphabetic'
 
   // Datum
@@ -58,7 +68,7 @@ export function drawSummary(ctx, d) {
   ctx.textAlign = 'left'
   ctx.fillText(d.left.name, PAD, 168)
   ctx.textAlign = 'right'
-  ctx.fillText(d.right.name, W - PAD, 168)
+  ctx.fillText(d.right.name, DESIGN_W - PAD, 168)
 
   ctx.font = font(700, 150)
   ctx.textAlign = 'left'
@@ -66,22 +76,31 @@ export function drawSummary(ctx, d) {
   ctx.fillText(String(d.left.goals), PAD, scoreY + 60)
   ctx.textAlign = 'right'
   ctx.fillStyle = d.right.ours ? CLUB : PAPER
-  ctx.fillText(String(d.right.goals), W - PAD, scoreY + 60)
+  ctx.fillText(String(d.right.goals), DESIGN_W - PAD, scoreY + 60)
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
   ctx.font = font(400, 90)
   ctx.textAlign = 'center'
-  ctx.fillText('–', W / 2, scoreY + 44)
+  ctx.fillText('–', DESIGN_W / 2, scoreY + 44)
+
+  if (d.ageGroup) {
+    ctx.fillStyle = FADED
+    ctx.font = font(600, 22)
+    ctx.textAlign = 'center'
+    ctx.fillText(d.ageGroup, DESIGN_W / 2, scoreY + 78)
+  }
 
   ctx.strokeStyle = HAIR
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(PAD, 360)
-  ctx.lineTo(W - PAD, 360)
+  ctx.lineTo(DESIGN_W - PAD, 360)
   ctx.stroke()
 
   drawChart(ctx, d, 424)
   drawScorers(ctx, d, 880)
+
+  ctx.restore()
 }
 
 function drawChart(ctx, d, top) {
@@ -91,7 +110,7 @@ function drawChart(ctx, d, top) {
   ctx.fillText('Zo verliep de score', PAD, top)
 
   const x0 = PAD
-  const x1 = W - PAD
+  const x1 = DESIGN_W - PAD
   const y0 = top + 50
   const y1 = top + 276
   const band = (x1 - x0) / 4
@@ -186,7 +205,7 @@ function drawScorers(ctx, d, top) {
   // zodat de lijst binnen het vaste canvasformaat blijft passen.
   const rows = d.scorers
   const listTop = top + 66
-  const available = H - 40 - listTop
+  const available = DESIGN_H - 40 - listTop
   const rowH = Math.min(66, Math.max(30, available / rows.length))
   const nameSize = rowH >= 58 ? 42 : rowH >= 48 ? 36 : rowH >= 40 ? 30 : 24
   const dotR = rowH >= 58 ? 12 : rowH >= 48 ? 10 : rowH >= 40 ? 8 : 6
@@ -210,21 +229,21 @@ function drawScorers(ctx, d, top) {
     for (let k = 0; k < dots; k++) {
       ctx.fillStyle = CLUB
       ctx.beginPath()
-      ctx.arc(W - PAD - dotGap / 2 - k * dotGap, y - rowH * 0.2, dotR, 0, Math.PI * 2)
+      ctx.arc(DESIGN_W - PAD - dotGap / 2 - k * dotGap, y - rowH * 0.2, dotR, 0, Math.PI * 2)
       ctx.fill()
     }
     if (s.goals > 8) {
       ctx.fillStyle = CLUB
       ctx.font = font(600, Math.max(22, nameSize - 10))
       ctx.textAlign = 'right'
-      ctx.fillText(`${s.goals}`, W - PAD - dotGap / 2 - 8 * dotGap, y - 2)
+      ctx.fillText(`${s.goals}`, DESIGN_W - PAD - dotGap / 2 - 8 * dotGap, y - 2)
     }
 
     ctx.strokeStyle = HAIR
     ctx.lineWidth = 2
     ctx.beginPath()
     ctx.moveTo(PAD, y + rowH * 0.33)
-    ctx.lineTo(W - PAD, y + rowH * 0.33)
+    ctx.lineTo(DESIGN_W - PAD, y + rowH * 0.33)
     ctx.stroke()
   })
 }
