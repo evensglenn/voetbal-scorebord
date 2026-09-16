@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { drawSummary, W as SHOT_W, H as SHOT_H } from './summary.js'
 
 const STORAGE_KEY = 'matchblad.v1'
 const PERIODS = [1, 2, 3, 4]
@@ -73,6 +74,7 @@ export default function App() {
   const [running, setRunning] = useState(false)
   const [screen, setScreen] = useState('match')
   const [asking, setAsking] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [standalone] = useState(
     () =>
       window.matchMedia?.('(display-mode: standalone)').matches ||
@@ -120,6 +122,46 @@ export default function App() {
   }, [match.events])
 
   const runs = useMemo(() => analyseRuns(match.events), [match.events])
+
+  const summary = useMemo(() => {
+    const ours = { name: TEAM, goals: score.us, ours: true }
+    const theirs = { name: OPPONENT, goals: score.them, ours: false }
+    const [left, right] = match.home ? [ours, theirs] : [theirs, ours]
+
+    let us = 0
+    let them = 0
+    const events = match.events.map((e) => {
+      if (e.team === 'us') us += 1
+      else them += 1
+      return { team: e.team, period: e.period, us, them }
+    })
+
+    const scorers = match.players
+      .map((p) => ({
+        name: p.name,
+        goals: goalsBy[p.id] ?? 0,
+        hattricks: runs.hattricks[p.id] ?? 0,
+      }))
+      .filter((s) => s.goals > 0)
+      .sort((a, b) => b.goals - a.goals || b.hattricks - a.hattricks || a.name.localeCompare(b.name))
+
+    const unnamed = match.events.filter((e) => e.team === 'us' && !e.playerId).length
+    if (unnamed > 0) scorers.push({ name: 'Zonder naam', goals: unnamed, hattricks: 0 })
+
+    return {
+      date: new Date().toLocaleDateString('nl-BE', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+      ourName: TEAM,
+      theirName: OPPONENT,
+      left,
+      right,
+      events,
+      scorers,
+    }
+  }, [match, score, goalsBy, runs])
 
   const addGoal = (team, playerId = null) =>
     setMatch((m) => ({
@@ -259,6 +301,9 @@ export default function App() {
             <button className="btn btn-quiet" onClick={undo} disabled={!match.events.length}>
               Laatste ongedaan maken
             </button>
+            <button className="btn" onClick={() => setSharing(true)}>
+              Samenvatting
+            </button>
             <button className="btn btn-quiet" onClick={() => setAsking(true)}>
               Nieuwe match
             </button>
@@ -300,6 +345,8 @@ export default function App() {
         )}
       </footer>
 
+      {sharing && <Summary data={summary} onClose={() => setSharing(false)} />}
+
       {asking && (
         <Confirm
           title="Nieuwe match starten?"
@@ -309,6 +356,103 @@ export default function App() {
           onCancel={() => setAsking(false)}
         />
       )}
+    </div>
+  )
+}
+
+function Summary({ data, onClose }) {
+  const [url, setUrl] = useState(null)
+  const [file, setFile] = useState(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let stale = false
+
+    const make = async () => {
+      try {
+        await document.fonts?.ready
+      } catch {
+        // zonder het webfont tekent het canvas met de systeemletter
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = SHOT_W
+      canvas.height = SHOT_H
+      drawSummary(canvas.getContext('2d'), data)
+      canvas.toBlob((blob) => {
+        if (stale) return
+        if (!blob) {
+          setFailed(true)
+          return
+        }
+        setUrl(URL.createObjectURL(blob))
+        setFile(new File([blob], 'matchblad.png', { type: 'image/png' }))
+      }, 'image/png')
+    }
+
+    make()
+    return () => {
+      stale = true
+    }
+  }, [data])
+
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  useEffect(() => () => url && URL.revokeObjectURL(url), [url])
+
+  const canShare = file && navigator.canShare?.({ files: [file] })
+
+  const share = async () => {
+    try {
+      await navigator.share({ files: [file], title: 'Matchblad' })
+    } catch {
+      // gedeeld venster weggeklikt: niets aan de hand
+    }
+  }
+
+  const save = () => {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `matchblad-${new Date().toISOString().slice(0, 10)}.png`
+    link.click()
+  }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div
+        className="dialog dialog-wide"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Samenvatting van de match"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {failed ? (
+          <p>De afbeelding kon niet gemaakt worden. Probeer het opnieuw.</p>
+        ) : url ? (
+          <img className="shot" src={url} alt="Samenvatting van de match" />
+        ) : (
+          <p>De samenvatting wordt getekend…</p>
+        )}
+
+        <div className="dialog-actions">
+          <button className="btn" onClick={onClose}>
+            Sluiten
+          </button>
+          {url && !canShare && (
+            <button className="btn btn-primary" onClick={save}>
+              Bewaren
+            </button>
+          )}
+          {canShare && (
+            <button className="btn btn-primary" onClick={share}>
+              Delen
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
