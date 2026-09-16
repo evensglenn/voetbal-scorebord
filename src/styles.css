@@ -1,0 +1,437 @@
+:root {
+  --ink: #11161b;
+  --ground: #e8eae6;
+  --paper: #ffffff;
+  --club: #e4600a;
+  --away: #59646f;
+  --muted: #667079;
+  --line: rgba(17, 22, 27, 0.16);
+  --radius: 3px;
+  font-family: 'Barlow Semi Condensed', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  -webkit-text-size-adjust: 100%;
+}
+
+.shell {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0 0 3rem;
+}
+
+/* Scorebord */
+.board {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 1.1rem 1rem 0.8rem;
+}
+
+.board-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 0.5rem;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.side-right {
+  align-items: flex-end;
+}
+
+.team-name {
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.goals {
+  font-size: 4.2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-top: 0.2rem;
+}
+
+.goals-ours {
+  color: var(--club);
+}
+
+.venue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.venue-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.venue-switch {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.venue-btn {
+  padding: 0.25rem 0.7rem;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+}
+
+.venue-btn.is-on {
+  background: var(--club);
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.dash {
+  align-self: end;
+  font-size: 2.6rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.35);
+  line-height: 1.4;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  background: var(--ink);
+  padding: 0 1rem;
+  gap: 1.25rem;
+}
+
+.tab {
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 0.55rem 0;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+}
+
+.tab.is-on {
+  color: var(--paper);
+  border-bottom-color: var(--club);
+}
+
+/* Klok en periodes */
+.clockbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
+.periods {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.per {
+  min-width: 2.6rem;
+  padding: 0.5rem 0.2rem;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.per.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.clock {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.clock-num {
+  font-size: 1.5rem;
+  font-weight: 600;
+  min-width: 3.4rem;
+}
+
+/* Algemene knoppen en velden */
+.btn {
+  padding: 0.6rem 0.85rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.btn-away {
+  background: var(--away);
+  border-color: var(--away);
+  color: var(--paper);
+}
+
+.btn-quiet {
+  background: none;
+  color: var(--muted);
+}
+
+.btn-wide {
+  flex: 1;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem 0;
+}
+
+.field {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.field-num {
+  flex: 0 0 4rem;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--club);
+  outline-offset: 2px;
+}
+
+/* Scorers */
+.section-title {
+  margin: 1.4rem 1rem 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  padding: 0 1rem;
+}
+
+.scorer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3.4rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--club);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 500;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.scorer:active {
+  background: var(--club);
+  border-color: var(--club);
+  color: var(--paper);
+}
+
+.scorer-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shirt {
+  flex: 0 0 auto;
+  min-width: 1.6rem;
+  padding: 0.1rem 0.3rem;
+  background: var(--ground);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--muted);
+}
+
+.tally {
+  margin-left: auto;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--club);
+}
+
+.scorer:active .tally,
+.scorer:active .shirt {
+  color: inherit;
+}
+
+/* Tijdslijn */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 1rem;
+}
+
+.tl-period + .tl-period {
+  margin-top: 0.9rem;
+}
+
+.tl-period h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0 0 0.3rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tl-none {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: rgba(102, 112, 121, 0.7);
+}
+
+.tl-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid rgba(17, 22, 27, 0.07);
+}
+
+.tl-score {
+  flex: 0 0 3rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--club);
+}
+
+.tl-row.is-away .tl-score {
+  color: var(--away);
+}
+
+.tl-who {
+  flex: 1;
+  font-size: 1.05rem;
+}
+
+.tl-min {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.tl-del {
+  background: none;
+  border: 0;
+  padding: 0.2rem 0.4rem;
+  font: inherit;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* Spelers */
+.squad {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0 1rem;
+}
+
+.squad li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.squad-name {
+  flex: 1;
+  font-size: 1.1rem;
+}
+
+.squad-goals {
+  font-weight: 600;
+  color: var(--club);
+}
+
+.empty {
+  margin: 0.4rem 1rem;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.foot {
+  margin: 2rem 1rem 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+@media (min-width: 30rem) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
