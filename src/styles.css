@@ -20,19 +20,20 @@ body {
   margin: 0;
   background: var(--ground);
   -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
 }
 
 .shell {
   max-width: 34rem;
   margin: 0 auto;
-  padding: 0 0 3rem;
+  padding: 0 0 calc(3rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* Scorebord */
 .board {
   background: var(--ink);
   color: var(--paper);
-  padding: 1.1rem 1rem 0.8rem;
+  padding: calc(1.1rem + env(safe-area-inset-top, 0px)) 1rem 0.8rem;
 }
 
 .board-row {
@@ -427,7 +428,13 @@ input:focus-visible {
 .foot {
   margin: 2rem 1rem 0;
   font-size: 0.85rem;
+  line-height: 1.45;
   color: var(--muted);
+}
+
+.foot p {
+  margin: 0 0 0.5rem;
+  max-width: 34ch;
 }
 
 @media (min-width: 30rem) {
@@ -515,4 +522,72 @@ input:focus-visible {
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--muted);
+}
+
+/* Bevestigingsvenster */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  background: rgba(17, 22, 27, 0.6);
+  animation: overlay-in 140ms ease-out;
+}
+
+.dialog {
+  width: 100%;
+  max-width: 22rem;
+  padding: 1.1rem 1.1rem 1rem;
+  background: var(--paper);
+  border-top: 4px solid var(--club);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(17, 22, 27, 0.3);
+  animation: dialog-in 160ms ease-out;
+}
+
+.dialog:focus {
+  outline: none;
+}
+
+.dialog h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.dialog p {
+  margin: 0 0 1.1rem;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .dialog {
+    animation: none;
+  }
 }

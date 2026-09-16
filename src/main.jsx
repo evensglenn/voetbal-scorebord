@@ -8,3 +8,14 @@ createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>,
 )
+
+// Zorgt ervoor dat het matchblad ook opent als er langs het veld geen bereik is.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
+      .catch(() => {
+        // Geen service worker (bijvoorbeeld zonder https): de app werkt gewoon online.
+      })
+  })
+}

@@ -72,6 +72,12 @@ export default function App() {
   const [match, setMatch] = useState(load)
   const [running, setRunning] = useState(false)
   const [screen, setScreen] = useState('match')
+  const [asking, setAsking] = useState(false)
+  const [standalone] = useState(
+    () =>
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true,
+  )
   const tick = useRef(null)
 
   useEffect(() => {
@@ -141,11 +147,10 @@ export default function App() {
   }
 
   const newMatch = () => {
-    if (!confirm('Nieuwe match starten? Score en tijdslijn worden gewist, spelers blijven.'))
-      return
     setRunning(false)
     setMatch((m) => ({ ...m, events: [], period: 1, clocks: [0, 0, 0, 0] }))
     setScreen('match')
+    setAsking(false)
   }
 
   return (
@@ -253,7 +258,7 @@ export default function App() {
             <button className="btn btn-quiet" onClick={undo} disabled={!match.events.length}>
               Laatste ongedaan maken
             </button>
-            <button className="btn btn-quiet" onClick={newMatch}>
+            <button className="btn btn-quiet" onClick={() => setAsking(true)}>
               Nieuwe match
             </button>
           </div>
@@ -281,8 +286,84 @@ export default function App() {
       )}
 
       <footer className="foot">
-        Alles blijft op dit toestel bewaard. 4 × 15 minuten, 5 tegen 5.
+        <p>Alles blijft op dit toestel bewaard. 4 × 15 minuten, 5 tegen 5.</p>
+        {!standalone && (
+          <p>
+            Zet het matchblad op je beginscherm en het opent zonder browserbalk: op iPhone
+            via Deel → Zet op beginscherm, op Android via het menu → App installeren.
+          </p>
+        )}
       </footer>
+
+      {asking && (
+        <Confirm
+          title="Nieuwe match starten?"
+          body={`De stand ${score.us}–${score.them} en de hele tijdslijn worden gewist. De spelerslijst blijft staan.`}
+          confirmLabel="Wissen en starten"
+          onConfirm={newMatch}
+          onCancel={() => setAsking(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function Confirm({ title, body, confirmLabel, onConfirm, onCancel }) {
+  const panel = useRef(null)
+
+  useEffect(() => {
+    panel.current?.focus()
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        onCancel()
+        return
+      }
+      if (e.key !== 'Tab') return
+      // Houd de focus binnen het venster zolang het openstaat.
+      const focusable = panel.current?.querySelectorAll('button') ?? []
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKey)
+    const scroll = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = scroll
+    }
+  }, [onCancel])
+
+  return (
+    <div className="overlay" onClick={onCancel}>
+      <div
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dialog-title"
+        tabIndex={-1}
+        ref={panel}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="dialog-title">{title}</h2>
+        <p>{body}</p>
+        <div className="dialog-actions">
+          <button className="btn" onClick={onCancel}>
+            Annuleren
+          </button>
+          <button className="btn btn-primary" onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
