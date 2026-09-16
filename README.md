@@ -1,4 +1,4 @@
-# Matchblad
+# Voetbal scorebord
 
 Score, doelpuntenmakers en tijdslijn bijhouden tijdens een U9-match (5 tegen 5, 4 × 15 minuten).
 Draait volledig in de browser en bewaart alles lokaal op het toestel — geen server, geen account.
