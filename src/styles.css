@@ -435,3 +435,84 @@ input:focus-visible {
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* Hattricks */
+.banner {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.55rem 1rem;
+  background: var(--club);
+  color: var(--ink);
+  animation: banner-in 200ms ease-out;
+}
+
+.banner-what {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.banner-who {
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+@keyframes banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
+}
+
+.scorer.is-hat {
+  border-color: var(--club);
+  border-left-width: 9px;
+}
+
+.hats {
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: var(--club);
+}
+
+.streak {
+  margin-left: auto;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.tl-row.is-hat {
+  padding-left: 0.5rem;
+  border-left: 3px solid var(--club);
+}
+
+.tl-row.is-hat-start {
+  margin-top: 0.25rem;
+}
+
+.tl-hat {
+  padding: 0.1rem 0.4rem;
+  background: var(--club);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.squad-hat {
+  margin-left: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted);
+}
