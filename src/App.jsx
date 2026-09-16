@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { drawSummary, W as SHOT_W, H as SHOT_H } from './summary.js'
+import { version as APP_VERSION } from '../package.json'
 
 const STORAGE_KEY = 'matchblad.v1'
 const PERIODS = [1, 2, 3, 4]
@@ -8,6 +9,11 @@ const TEAM = 'Lummen United'
 const OPPONENT = 'Tegenstander'
 
 const periodSecondsFor = (ageGroup) => PERIOD_SECONDS_BY_AGE[ageGroup] ?? PERIOD_SECONDS_BY_AGE.U9
+
+const RULES_URL = {
+  U7: 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/3V3_Spelreglementjeugdvoetbalposter.pdf',
+  U9: 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/5V5_Spelreglementjeugdvoetbalposter.pdf',
+}
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 
@@ -204,7 +210,12 @@ export default function App() {
 
   return (
     <div className="shell">
-      <Scoreboard home={match.home} score={score} opponentName={opponentName} />
+      <Scoreboard
+        home={match.home}
+        score={score}
+        opponentName={opponentName}
+        ageGroup={match.ageGroup}
+      />
 
       <nav className="tabs">
         <button
@@ -354,7 +365,7 @@ export default function App() {
       )}
 
       <footer className="foot">
-        <p>v0.1.0</p>
+        <p>v{APP_VERSION}</p>
       </footer>
 
       {sharing && <Summary data={summary} onClose={() => setSharing(false)} />}
@@ -543,7 +554,7 @@ function HattrickBanner({ live, players }) {
   )
 }
 
-function Scoreboard({ home, score, opponentName }) {
+function Scoreboard({ home, score, opponentName, ageGroup }) {
   const ours = { name: TEAM, goals: score.us, ours: true }
   const theirs = { name: opponentName, goals: score.them, ours: false }
   const [left, right] = home ? [ours, theirs] : [theirs, ours]
@@ -555,9 +566,12 @@ function Scoreboard({ home, score, opponentName }) {
           <span className="team-name">{left.name}</span>
           <span className={left.ours ? 'goals goals-ours' : 'goals'}>{left.goals}</span>
         </div>
-        <span className="dash" aria-hidden="true">
-          –
-        </span>
+        <div className="board-mid">
+          <span className="dash" aria-hidden="true">
+            –
+          </span>
+          <span className="age-badge">{ageGroup}</span>
+        </div>
         <div className="side side-right">
           <span className="team-name">{right.name}</span>
           <span className={right.ours ? 'goals goals-ours' : 'goals'}>{right.goals}</span>
@@ -702,6 +716,16 @@ function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
   )
 }
 
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" focusable="false">
+      <circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="10" cy="6.3" r="1.15" fill="currentColor" />
+      <rect x="8.9" y="8.9" width="2.2" height="6" rx="1.1" fill="currentColor" />
+    </svg>
+  )
+}
+
 function Wedstrijd({ opponent, onOpponentChange, home, onVenueChange, ageGroup, onAgeGroupChange }) {
   return (
     <section className="pane-squad">
@@ -756,6 +780,16 @@ function Wedstrijd({ opponent, onOpponentChange, home, onVenueChange, ageGroup, 
           </button>
         </div>
       </div>
+
+      <a
+        className="rules-link"
+        href={RULES_URL[ageGroup]}
+        target="_blank"
+        rel="noreferrer"
+      >
+        <InfoIcon />
+        Spelreglement {ageGroup} bekijken (pdf)
+      </a>
 
       <p className="empty">
         De naam van de tegenstander verschijnt op het scorebord en in de samenvatting. De
