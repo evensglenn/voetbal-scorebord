@@ -1,7 +1,9 @@
 # Matchblad
 
-Score, doelpuntenmakers en tijdslijn bijhouden tijdens een U9-match (5 tegen 5, 4 × 15 minuten).
-Draait volledig in de browser en bewaart alles lokaal op het toestel — geen server, geen account.
+Score, doelpuntenmakers en tijdslijn bijhouden langs de lijn — voor U7 (3 tegen 3) en U9
+(5 tegen 5). Geen papieren blaadje meer dat nat wordt in de regen: dit draait volledig in
+de browser en bewaart alles lokaal op het toestel. Geen server, geen account, geen
+internet nodig zodra de pagina één keer geladen is.
 
 ## Lokaal draaien
 
@@ -25,8 +27,8 @@ base automatisch `/`.
 
 ## Gebruik
 
-- Lummen United staat vast in het scorebord. Met de schakelaar **thuis / uit** wissel je
-  van kant: bij een uitmatch staat de tegenstander links.
+- Vul bij **Wedstrijd** de naam van de tegenstander in, kies of Lummen United thuis of uit
+  speelt, en kies de leeftijdscategorie. Zie hieronder voor wat dat allemaal doet.
 - Voeg de spelers toe onder **Spelers**, met of zonder rugnummer.
 - Kies de periode (P1 tot P4). De klok is optioneel; wie ze laat lopen krijgt de
   tijd er in de tijdslijn bij, wie dat niet doet ziet enkel de volgorde.
@@ -35,6 +37,21 @@ base automatisch `/`.
 - **Laatste ongedaan maken** haalt een misklik weg; in de tijdslijn kan elk doelpunt apart
   met × verwijderd worden.
 - **Nieuwe match** wist score en tijdslijn, de spelerslijst blijft staan.
+
+## Wedstrijdinstellingen
+
+Het tabblad **Wedstrijd** verzamelt alles wat per match verschilt:
+
+- **Tegenstander** — de naam die je hier intikt verschijnt op het scorebord, in de
+  tijdslijn en in de gegenereerde samenvatting. Leeg gelaten? Dan staat er gewoon
+  "Tegenstander".
+- **Thuis / uit** — bepaalt aan welke kant Lummen United op het scorebord staat.
+- **Leeftijdscategorie** — **U7** speelt 4 × 10 minuten, **U9** speelt 4 × 15 minuten. De
+  klok op het Match-scherm houdt daar automatisch rekening mee, en onder de keuze staat een
+  link naar het officiële spelreglement (pdf) van Voetbal Vlaanderen voor die categorie.
+
+De gekozen categorie zie je ook meteen terug op het scorebord, netjes tussen de twee
+ploegnamen in.
 
 ## Op je gsm zetten
 
@@ -61,9 +78,10 @@ resultaat in een venster. Op een telefoon verschijnt **Delen**, wat het deelvens
 toestel opent (WhatsApp, Foto's, …); waar dat niet kan, staat er **Bewaren** en wordt de
 PNG gedownload.
 
-Op de afbeelding staan de uitslag, een verloopgrafiek met de vier periodes, en de
-doelpuntenmakers met een bolletje per goal en een label bij een hattrick. De tekenlogica
-staat apart in `src/summary.js`.
+Op de afbeelding staan de namen van beide ploegen, de uitslag, een verloopgrafiek met de
+vier periodes, en álle doelpuntenmakers — met een bolletje per goal en een label bij een
+hattrick. Scoort de halve ploeg? Dan krimpen de rijen gewoon een beetje zodat iedereen erop
+past. De tekenlogica staat apart in `src/summary.js`.
 
 ## Liggend scherm
 
@@ -80,3 +98,8 @@ Je ziet het op drie plaatsen: een oranje balk bovenaan zodra het zover is, een d
 rand langs de betrokken doelpunten in de tijdslijn met het label erbij, en een teller per
 speler in de spelerslijst. Staat iemand op twee op rij, dan verschijnt dat al op zijn knop.
 Loopt de reeks door tot vier of vijf, dan telt het label mee.
+
+## Versie
+
+Onderaan de app staat een versienummer (bv. `v0.3.0`), rechtstreeks uit `package.json`.
+Bij elke wijziging aan de app hoort dat nummer een tikje omhoog te gaan.
