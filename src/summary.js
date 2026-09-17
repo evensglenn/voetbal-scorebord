@@ -55,6 +55,17 @@ export function drawSummary(ctx, d, logo) {
   ctx.fillRect(0, 0, DESIGN_W, DESIGN_H)
   ctx.textBaseline = 'alphabetic'
 
+  // Groot, grijs en gedempt clublogo op de achtergrond onderaan — zichtbaar als
+  // afzender, maar getekend vóór de tekst zodat die er leesbaar overheen blijft staan.
+  if (logo) {
+    const logoSize = 160
+    ctx.save()
+    ctx.filter = 'grayscale(1)'
+    ctx.globalAlpha = 0.3
+    ctx.drawImage(logo, (DESIGN_W - logoSize) / 2, DESIGN_H - logoSize - 8, logoSize, logoSize)
+    ctx.restore()
+  }
+
   // Datum
   ctx.fillStyle = FADED
   ctx.font = font(500, 30)
@@ -99,16 +110,6 @@ export function drawSummary(ctx, d, logo) {
 
   drawChart(ctx, d, 424)
   drawScorers(ctx, d, 880)
-
-  // Grijs en gedempt clublogo onderaan — een subtiele afzender, geen blikvanger.
-  if (logo) {
-    const logoSize = 40
-    ctx.save()
-    ctx.filter = 'grayscale(1)'
-    ctx.globalAlpha = 0.3
-    ctx.drawImage(logo, (DESIGN_W - logoSize) / 2, DESIGN_H - logoSize - 8, logoSize, logoSize)
-    ctx.restore()
-  }
 
   ctx.restore()
 }
