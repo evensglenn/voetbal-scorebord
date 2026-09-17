@@ -284,17 +284,18 @@ export default function App() {
                   <ResetIcon />
                 </button>
               </div>
-              <div className="periods periods-wide" aria-label="Periode kiezen">
-                {PERIODS.map((p) => (
-                  <button
-                    key={p}
-                    className={p === match.period ? 'per is-on' : 'per'}
-                    onClick={() => setPeriod(p)}
-                    aria-pressed={p === match.period}
-                  >
-                    P{p}
-                  </button>
-                ))}
+              <div className="period-step">
+                <span className="period-progress">Periode {match.period} van {PERIODS.length}</span>
+                <button
+                  className="btn btn-next-period"
+                  onClick={() => setPeriod(match.period + 1)}
+                  disabled={match.period === PERIODS.length}
+                >
+                  {match.period === PERIODS.length
+                    ? 'Laatste periode'
+                    : `Naar periode ${match.period + 1}`}
+                  {match.period < PERIODS.length && <span aria-hidden="true">→</span>}
+                </button>
               </div>
             </section>
 

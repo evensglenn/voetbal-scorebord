@@ -154,15 +154,6 @@ body {
   gap: 0.35rem;
 }
 
-.periods-wide {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  width: 100%;
-  padding: 0.25rem;
-  background: var(--ground);
-  border-radius: var(--radius);
-}
-
 .per {
   min-width: 2.8rem;
   min-height: 2.75rem;
@@ -209,6 +200,34 @@ body {
   font-weight: 700;
   line-height: 1.05;
   min-width: 4.5rem;
+}
+
+.period-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line-soft);
+}
+
+.period-progress {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.btn-next-period {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 9rem;
+  background: transparent;
+}
+
+.btn-next-period:not(:disabled) {
+  border-color: var(--ink);
 }
 
 /* Algemene knoppen en velden */
@@ -884,10 +903,6 @@ input:focus-visible {
 
   .clock-num {
     font-size: 1.65rem;
-  }
-
-  .periods-wide .per {
-    min-height: 2.5rem;
   }
 
   .section-title {
