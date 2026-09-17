@@ -88,7 +88,6 @@ export default function App() {
   const [resetting, setResetting] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [compactBoard, setCompactBoard] = useState(false)
-  const [periodUndo, setPeriodUndo] = useState(null)
   const [standalone] = useState(
     () =>
       window.matchMedia?.('(display-mode: standalone)').matches ||
@@ -130,6 +129,8 @@ export default function App() {
 
   const clock = match.clocks[match.period - 1]
   const periodSeconds = periodSecondsFor(match.ageGroup)
+  const canUndoPeriod =
+    match.period > 1 && !match.events.some((event) => event.period === match.period)
   useEffect(() => {
     if (clock >= periodSeconds) setRunning(false)
   }, [clock, periodSeconds])
@@ -194,7 +195,6 @@ export default function App() {
   }, [match, score, goalsBy, runs, opponentName])
 
   const addGoal = (team, playerId = null) => {
-    setPeriodUndo(null)
     setMatch((m) => ({
       ...m,
       events: [
@@ -218,21 +218,18 @@ export default function App() {
   const advancePeriod = () => {
     if (match.period >= PERIODS.length) return
     setRunning(false)
-    setPeriodUndo(match.period)
     setMatch((m) => ({ ...m, period: m.period + 1 }))
   }
 
   const undoPeriodChange = () => {
-    if (periodUndo === null) return
+    if (match.period <= 1) return
     setRunning(false)
-    setMatch((m) => ({ ...m, period: periodUndo }))
-    setPeriodUndo(null)
+    setMatch((m) => ({ ...m, period: m.period - 1 }))
   }
 
   const newMatch = () => {
     setRunning(false)
     setMatch((m) => ({ ...m, events: [], period: 1, clocks: [0, 0, 0, 0] }))
-    setPeriodUndo(null)
     setScreen('match')
     setAsking(false)
   }
@@ -312,16 +309,17 @@ export default function App() {
                   {running ? <PauseIcon /> : <PlayIcon />}
                   <span>{running ? 'Pauze' : 'Start'}</span>
                 </button>
-                <button
-                  className="btn btn-next-period"
-                  onClick={advancePeriod}
-                  disabled={match.period === PERIODS.length}
-                >
-                  {match.period === PERIODS.length
-                    ? 'Laatste periode'
-                    : `Naar periode ${match.period + 1}`}
-                  {match.period < PERIODS.length && <span aria-hidden="true">→</span>}
-                </button>
+                {match.period < PERIODS.length && (
+                  <button
+                    className="btn btn-next-period"
+                    onClick={advancePeriod}
+                    aria-label={`Naar periode ${match.period + 1}`}
+                    title={`Naar periode ${match.period + 1}`}
+                  >
+                    <span>{match.period + 1}</span>
+                    <span className="next-arrow" aria-hidden="true">→</span>
+                  </button>
+                )}
               </div>
             </section>
 
@@ -367,7 +365,7 @@ export default function App() {
             </button>
           </div>
 
-          {periodUndo !== null ? (
+          {canUndoPeriod ? (
             <section className="period-change" aria-live="polite">
               <div className="period-change-copy">
                 <span className="period-change-check" aria-hidden="true">✓</span>
