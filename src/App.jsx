@@ -234,66 +234,76 @@ export default function App() {
         <button
           className={screen === 'match' ? 'tab is-on' : 'tab'}
           onClick={() => setScreen('match')}
+          aria-current={screen === 'match' ? 'page' : undefined}
         >
-          Match
+          <LiveIcon />
+          <span>Live</span>
         </button>
         <button
           className={screen === 'squad' ? 'tab is-on' : 'tab'}
           onClick={() => setScreen('squad')}
+          aria-current={screen === 'squad' ? 'page' : undefined}
         >
-          Spelers
+          <TeamIcon />
+          <span>Ploeg</span>
         </button>
         <button
           className={screen === 'wedstrijd' ? 'tab is-on' : 'tab'}
           onClick={() => setScreen('wedstrijd')}
+          aria-current={screen === 'wedstrijd' ? 'page' : undefined}
         >
-          Wedstrijd
+          <SettingsIcon />
+          <span>Instellingen</span>
         </button>
       </nav>
 
       {screen === 'match' ? (
         <>
           <div className="pane pane-play">
-          <section className="clockbar">
-            <div className="periods">
-              {PERIODS.map((p) => (
+            <section className="clockbar">
+              <div className="clock">
+                <div className="clock-readout">
+                  <span className="clock-label">Periode {match.period}</span>
+                  <span className="clock-num">{mmss(clock)}</span>
+                </div>
                 <button
-                  key={p}
-                  className={p === match.period ? 'per is-on' : 'per'}
-                  onClick={() => setPeriod(p)}
-                  aria-pressed={p === match.period}
+                  className={running ? 'btn btn-clock is-running' : 'btn btn-clock'}
+                  onClick={() => setRunning((r) => !r)}
+                  aria-label={running ? 'Pauze' : 'Start'}
+                  title={running ? 'Pauze' : 'Start'}
                 >
-                  P{p}
+                  {running ? <PauseIcon /> : <PlayIcon />}
+                  <span>{running ? 'Pauze' : 'Start'}</span>
                 </button>
-              ))}
-            </div>
-            <div className="clock">
-              <span className="clock-num">{mmss(clock)}</span>
-              <button
-                className="btn btn-icon"
-                onClick={() => setRunning((r) => !r)}
-                aria-label={running ? 'Pauze' : 'Start'}
-                title={running ? 'Pauze' : 'Start'}
-              >
-                {running ? <PauseIcon /> : <PlayIcon />}
-              </button>
-              <button
-                className="btn btn-quiet btn-icon"
-                onClick={() => setResetting(true)}
-                aria-label="Terug op nul"
-                title="Terug op nul"
-              >
-                <ResetIcon />
-              </button>
-            </div>
-          </section>
+                <button
+                  className="btn btn-quiet btn-icon"
+                  onClick={() => setResetting(true)}
+                  aria-label="Terug op nul"
+                  title="Terug op nul"
+                >
+                  <ResetIcon />
+                </button>
+              </div>
+              <div className="periods periods-wide" aria-label="Periode kiezen">
+                {PERIODS.map((p) => (
+                  <button
+                    key={p}
+                    className={p === match.period ? 'per is-on' : 'per'}
+                    onClick={() => setPeriod(p)}
+                    aria-pressed={p === match.period}
+                  >
+                    P{p}
+                  </button>
+                ))}
+              </div>
+            </section>
 
           <HattrickBanner live={runs.live} players={match.players} />
 
           <h2 className="section-title">Wie scoorde?</h2>
           {match.players.length === 0 && (
             <p className="empty">
-              Nog geen spelers. Voeg ze toe bij <strong>Spelers</strong> en tik hier daarna
+              Nog geen spelers. Voeg ze toe bij <strong>Ploeg</strong> en tik hier daarna
               op de naam van de scorer.
             </p>
           )}
@@ -321,24 +331,23 @@ export default function App() {
             <button className="scorer scorer-neutral" onClick={() => addGoal('us', null)}>
               Zonder naam
             </button>
-            <button className="scorer scorer-away" onClick={() => addGoal('them')}>
+          </div>
+
+          <div className="opponent-action">
+            <button className="btn btn-away btn-opponent" onClick={() => addGoal('them')}>
+              <span aria-hidden="true">+</span>
               Tegendoelpunt
             </button>
           </div>
 
-          <div className="row">
-            <button
-              className="btn btn-quiet btn-icon"
-              onClick={undo}
-              disabled={!match.events.length}
-              aria-label="Laatste ongedaan maken"
-              title="Laatste ongedaan maken"
-            >
-              <UndoIcon />
-            </button>
-          </div>
+          <LastAction
+            match={match}
+            score={score}
+            opponentName={opponentName}
+            onUndo={undo}
+          />
 
-          <div className="row">
+          <div className="row row-secondary">
             <button className="btn" onClick={() => setSharing(true)}>
               Samenvatting
             </button>
@@ -629,12 +638,15 @@ function Timeline({ match, runs, opponentName, onRemove }) {
     const player = match.players.find((p) => p.id === e.playerId)
     return { ...e, us, them, name: player?.name ?? null }
   })
+  const visiblePeriods = PERIODS.filter(
+    (period) => period === match.period || rows.some((row) => row.period === period),
+  )
 
   return (
     <>
       <h2 className="section-title">Tijdslijn</h2>
       <ol className="timeline">
-        {PERIODS.map((p) => {
+        {visiblePeriods.map((p) => {
           const inPeriod = rows.filter((r) => r.period === p)
           return (
             <li key={p} className="tl-period">
@@ -676,6 +688,31 @@ function Timeline({ match, runs, opponentName, onRemove }) {
         })}
       </ol>
     </>
+  )
+}
+
+function LastAction({ match, score, opponentName, onUndo }) {
+  const last = match.events.at(-1)
+  if (!last) return null
+
+  const player = match.players.find((candidate) => candidate.id === last.playerId)
+  const label =
+    last.team === 'them' ? opponentName : player?.name ? player.name : 'Doelpunt zonder naam'
+
+  return (
+    <section className="last-action" aria-live="polite">
+      <div className="last-action-copy">
+        <span className="last-action-check" aria-hidden="true">✓</span>
+        <span>
+          <strong>Doelpunt geregistreerd</strong>
+          <span className="last-action-meta">{label} · {score.us}–{score.them}</span>
+        </span>
+      </div>
+      <button className="btn btn-undo" onClick={onUndo}>
+        <UndoIcon />
+        Ongedaan maken
+      </button>
+    </section>
   )
 }
 
@@ -804,6 +841,35 @@ function UndoIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  )
+}
+
+function LiveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="3" fill="currentColor" />
+      <path d="M6.7 6.7a7.5 7.5 0 0 0 0 10.6M17.3 6.7a7.5 7.5 0 0 1 0 10.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function TeamIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="17" cy="9" r="2.3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M3.5 19c.4-3.4 2.3-5.2 5.5-5.2s5.1 1.8 5.5 5.2M14.2 14.5c.8-.5 1.7-.7 2.8-.7 2.2 0 3.5 1.2 3.8 3.7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   )
 }
