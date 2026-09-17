@@ -38,8 +38,9 @@ body {
   z-index: 5;
   background: var(--ink);
   color: var(--paper);
-  padding: calc(0.8rem + env(safe-area-inset-top, 0px)) 1rem 0.65rem;
+  padding: calc(1rem + env(safe-area-inset-top, 0px)) 1rem 0.85rem;
   box-shadow: 0 2px 12px rgba(17, 22, 27, 0.2);
+  transition: padding 180ms ease, box-shadow 180ms ease;
 }
 
 .board-row {
@@ -60,17 +61,22 @@ body {
 }
 
 .team-name {
-  font-size: 1rem;
+  overflow: hidden;
+  font-size: 1.2rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   color: rgba(255, 255, 255, 0.82);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: font-size 180ms ease;
 }
 
 .goals {
-  font-size: 3.5rem;
+  font-size: 4.8rem;
   font-weight: 700;
   line-height: 1;
   margin-top: 0.2rem;
+  transition: font-size 180ms ease, margin 180ms ease;
 }
 
 .goals-ours {
@@ -89,6 +95,7 @@ body {
   font-weight: 400;
   color: rgba(255, 255, 255, 0.35);
   line-height: 1.4;
+  transition: font-size 180ms ease, line-height 180ms ease;
 }
 
 .age-badge {
@@ -97,6 +104,32 @@ body {
   font-weight: 600;
   letter-spacing: 0.06em;
   color: rgba(255, 255, 255, 0.45);
+  transition: font-size 180ms ease, margin 180ms ease;
+}
+
+.board.is-compact {
+  padding-top: calc(0.35rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 0.35rem;
+  box-shadow: 0 3px 14px rgba(17, 22, 27, 0.26);
+}
+
+.board.is-compact .team-name {
+  font-size: 0.9rem;
+}
+
+.board.is-compact .goals {
+  margin-top: 0;
+  font-size: 2.25rem;
+}
+
+.board.is-compact .dash {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.board.is-compact .age-badge {
+  margin-top: 0;
+  font-size: 0.62rem;
 }
 
 /* Tabs */
@@ -143,8 +176,7 @@ body {
 .clockbar {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem 1rem;
+  padding: 0.85rem 1rem;
   background: var(--paper);
   border-bottom: 1px solid var(--line);
 }
@@ -185,6 +217,7 @@ body {
   display: flex;
   flex: 1;
   flex-direction: column;
+  min-width: 0;
 }
 
 .clock-label {
@@ -202,19 +235,31 @@ body {
   min-width: 4.5rem;
 }
 
-.period-step {
+.clock-time {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--line-soft);
+  gap: 0.2rem;
 }
 
-.period-progress {
-  font-size: 0.9rem;
-  font-weight: 600;
+.btn.btn-clock-reset {
+  display: inline-flex;
+  flex: 0 0 2rem;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
   color: var(--muted);
+}
+
+.btn-clock-reset svg {
+  display: block;
+  width: 1rem;
+  height: 1rem;
 }
 
 .btn-next-period {
@@ -222,12 +267,84 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  min-width: 9rem;
+  min-width: 8.4rem;
   background: transparent;
 }
 
 .btn-next-period:not(:disabled) {
   border-color: var(--ink);
+}
+
+.period-change {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.7rem 1rem 0;
+  padding: 0.75rem;
+  background: rgba(228, 96, 10, 0.1);
+  border: 1px solid rgba(228, 96, 10, 0.25);
+  border-radius: var(--radius);
+}
+
+.period-change-copy {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.period-change-copy > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.period-change-copy > span:last-child > span {
+  color: var(--muted);
+}
+
+.period-change-check {
+  display: inline-flex;
+  flex: 0 0 1.8rem;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  background: var(--club);
+  border-radius: 50%;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+@media (max-width: 29.99rem) {
+  .clock {
+    gap: 0.25rem;
+  }
+
+  .clock-num {
+    min-width: 3.6rem;
+    font-size: 1.8rem;
+  }
+
+  .btn-clock {
+    min-width: 2.75rem;
+    width: 2.75rem;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .btn-clock span {
+    display: none;
+  }
+
+  .btn-next-period {
+    min-width: 7.2rem;
+    padding-right: 0.6rem;
+    padding-left: 0.6rem;
+    font-size: 0.9rem;
+  }
 }
 
 /* Algemene knoppen en velden */
@@ -660,6 +777,7 @@ input:focus-visible {
 }
 
 @media (max-width: 22rem) {
+  .period-change,
   .last-action {
     align-items: stretch;
     flex-direction: column;
@@ -705,6 +823,11 @@ input:focus-visible {
     animation: none;
   }
 
+  .board,
+  .team-name,
+  .goals,
+  .dash,
+  .age-badge,
   .scorer {
     transition: none;
   }

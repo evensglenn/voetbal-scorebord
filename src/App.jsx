@@ -87,6 +87,8 @@ export default function App() {
   const [asking, setAsking] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [compactBoard, setCompactBoard] = useState(false)
+  const [periodUndo, setPeriodUndo] = useState(null)
   const [standalone] = useState(
     () =>
       window.matchMedia?.('(display-mode: standalone)').matches ||
@@ -113,6 +115,18 @@ export default function App() {
     }, 1000)
     return () => clearInterval(tick.current)
   }, [running])
+
+  useEffect(() => {
+    const onScroll = () => {
+      setCompactBoard((compact) =>
+        compact ? window.scrollY > 12 : window.scrollY > 56,
+      )
+    }
+
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const clock = match.clocks[match.period - 1]
   const periodSeconds = periodSecondsFor(match.ageGroup)
@@ -179,7 +193,8 @@ export default function App() {
     }
   }, [match, score, goalsBy, runs, opponentName])
 
-  const addGoal = (team, playerId = null) =>
+  const addGoal = (team, playerId = null) => {
+    setPeriodUndo(null)
     setMatch((m) => ({
       ...m,
       events: [
@@ -193,20 +208,31 @@ export default function App() {
         },
       ],
     }))
+  }
 
   const undo = () => setMatch((m) => ({ ...m, events: m.events.slice(0, -1) }))
 
   const removeEvent = (id) =>
     setMatch((m) => ({ ...m, events: m.events.filter((e) => e.id !== id) }))
 
-  const setPeriod = (p) => {
+  const advancePeriod = () => {
+    if (match.period >= PERIODS.length) return
     setRunning(false)
-    setMatch((m) => ({ ...m, period: p }))
+    setPeriodUndo(match.period)
+    setMatch((m) => ({ ...m, period: m.period + 1 }))
+  }
+
+  const undoPeriodChange = () => {
+    if (periodUndo === null) return
+    setRunning(false)
+    setMatch((m) => ({ ...m, period: periodUndo }))
+    setPeriodUndo(null)
   }
 
   const newMatch = () => {
     setRunning(false)
     setMatch((m) => ({ ...m, events: [], period: 1, clocks: [0, 0, 0, 0] }))
+    setPeriodUndo(null)
     setScreen('match')
     setAsking(false)
   }
@@ -228,6 +254,7 @@ export default function App() {
         score={score}
         opponentName={opponentName}
         ageGroup={match.ageGroup}
+        compact={compactBoard}
       />
 
       <nav className="tabs">
@@ -264,7 +291,17 @@ export default function App() {
               <div className="clock">
                 <div className="clock-readout">
                   <span className="clock-label">Periode {match.period}</span>
-                  <span className="clock-num">{mmss(clock)}</span>
+                  <div className="clock-time">
+                    <span className="clock-num">{mmss(clock)}</span>
+                    <button
+                      className="btn btn-quiet btn-clock-reset"
+                      onClick={() => setResetting(true)}
+                      aria-label="Klok terug op nul"
+                      title="Klok terug op nul"
+                    >
+                      <ResetIcon />
+                    </button>
+                  </div>
                 </div>
                 <button
                   className={running ? 'btn btn-clock is-running' : 'btn btn-clock'}
@@ -276,19 +313,8 @@ export default function App() {
                   <span>{running ? 'Pauze' : 'Start'}</span>
                 </button>
                 <button
-                  className="btn btn-quiet btn-icon"
-                  onClick={() => setResetting(true)}
-                  aria-label="Terug op nul"
-                  title="Terug op nul"
-                >
-                  <ResetIcon />
-                </button>
-              </div>
-              <div className="period-step">
-                <span className="period-progress">Periode {match.period} van {PERIODS.length}</span>
-                <button
                   className="btn btn-next-period"
-                  onClick={() => setPeriod(match.period + 1)}
+                  onClick={advancePeriod}
                   disabled={match.period === PERIODS.length}
                 >
                   {match.period === PERIODS.length
@@ -341,12 +367,28 @@ export default function App() {
             </button>
           </div>
 
-          <LastAction
-            match={match}
-            score={score}
-            opponentName={opponentName}
-            onUndo={undo}
-          />
+          {periodUndo !== null ? (
+            <section className="period-change" aria-live="polite">
+              <div className="period-change-copy">
+                <span className="period-change-check" aria-hidden="true">✓</span>
+                <span>
+                  <strong>Periode {match.period} gestart</strong>
+                  <span>Klok staat klaar op {mmss(clock)}</span>
+                </span>
+              </div>
+              <button className="btn btn-undo" onClick={undoPeriodChange}>
+                <UndoIcon />
+                Ongedaan maken
+              </button>
+            </section>
+          ) : (
+            <LastAction
+              match={match}
+              score={score}
+              opponentName={opponentName}
+              onUndo={undo}
+            />
+          )}
 
           <div className="row row-secondary">
             <button className="btn" onClick={() => setSharing(true)}>
@@ -594,13 +636,13 @@ function HattrickBanner({ live, players }) {
   )
 }
 
-function Scoreboard({ home, score, opponentName, ageGroup }) {
+function Scoreboard({ home, score, opponentName, ageGroup, compact }) {
   const ours = { name: TEAM, goals: score.us, ours: true }
   const theirs = { name: opponentName, goals: score.them, ours: false }
   const [left, right] = home ? [ours, theirs] : [theirs, ours]
 
   return (
-    <header className="board">
+    <header className={compact ? 'board is-compact' : 'board'}>
       <div className="board-row">
         <div className="side">
           <span className="team-name">{left.name}</span>
