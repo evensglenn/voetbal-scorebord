@@ -1,3 +1,10 @@
 node_modules
 dist
 .DS_Store
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# BMAD-METHOD: lokaal AI-werkgereedschap, hoort niet in de repo
+_bmad/
+_bmad-output/
+.claude/skills/
