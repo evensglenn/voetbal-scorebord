@@ -3,39 +3,130 @@ import { drawSummary, loadClubLogo, heightFor, W as SHOT_W } from './summary.js'
 import { version as APP_VERSION } from '../package.json'
 
 const STORAGE_KEY = 'matchblad.v1'
-const PERIODS = [1, 2, 3, 4]
-const PERIOD_SECONDS_BY_AGE = { U7: 10 * 60, U9: 15 * 60 }
 const TEAM = 'Lummen United'
 const OPPONENT = 'Tegenstander'
 const CLUB_LOGO = `${import.meta.env.BASE_URL}club-logo.png`
 
-const periodSecondsFor = (ageGroup) => PERIOD_SECONDS_BY_AGE[ageGroup] ?? PERIOD_SECONDS_BY_AGE.U9
+// Officiële Voetbal Vlaanderen-spelfiches: formaat + aanbevolen periodes/minuten
+// per leeftijd. Periodes/minuten zijn nadien vrij aanpasbaar (oefenmatchen en
+// tornooien wijken vaak af); dit dient enkel als slim standaardvoorstel.
+// U18 komt niet voor in de officiële fiches (die springen van U17 naar
+// U19-U21) en krijgt daarom voorlopig dezelfde waarden als U19-U21.
+// U7 wijkt bewust af van de officiële fiche (2 × 5') naar de waarde die bij
+// deze club effectief gebruikt wordt (4 × 10').
+const AGE_CONFIG = {
+  U6: { format: '2v2', periods: 2, minutes: 3 },
+  U7: { format: '3v3', periods: 4, minutes: 10 },
+  U8: { format: '5v5', periods: 4, minutes: 15 },
+  U9: { format: '5v5', periods: 4, minutes: 15 },
+  U10: { format: '8v8', periods: 4, minutes: 15 },
+  U11: { format: '8v8', periods: 4, minutes: 15 },
+  U12: { format: '8v8', periods: 4, minutes: 20 },
+  U13: { format: '8v8', periods: 4, minutes: 20 },
+  U14: { format: '11v11', periods: 4, minutes: 20 },
+  U15: { format: '11v11', periods: 4, minutes: 20 },
+  U16: { format: '11v11', periods: 4, minutes: 20 },
+  U17: { format: '11v11', periods: 4, minutes: 20 },
+  U18: { format: '11v11', periods: 2, minutes: 45 },
+  U19: { format: '11v11', periods: 2, minutes: 45 },
+  U20: { format: '11v11', periods: 2, minutes: 45 },
+  U21: { format: '11v11', periods: 2, minutes: 45 },
+}
+const AGE_ORDER = Object.keys(AGE_CONFIG)
 
-const RULES_URL = {
-  U7: 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/3V3_Spelreglementjeugdvoetbalposter.pdf',
-  U9: 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/5V5_Spelreglementjeugdvoetbalposter.pdf',
+const FORMAT_LABELS = {
+  '2v2': '2 tegen 2',
+  '3v3': '3 tegen 3',
+  '5v5': '5 tegen 5',
+  '8v8': '8 tegen 8',
+  '11v11': '11 tegen 11',
+}
+
+const FORMAT_RULES_URL = {
+  '2v2': 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/2V2_Spelreglement+jeugdvoetbal.pdf',
+  '3v3': 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/3V3_Spelreglementjeugdvoetbalposter.pdf',
+  '5v5': 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/5V5_Spelreglementjeugdvoetbalposter.pdf',
+  '8v8': 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/8V8_Spelreglementjeugdvoetbalposter.pdf',
+  '11v11': 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/11V11_Spelreglementjeugdvoetbalposter.pdf',
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 
-const emptyMatch = () => ({
-  home: true,
-  opponent: '',
-  ageGroup: 'U9',
-  players: [],
-  events: [],
-  period: 1,
-  clocks: [0, 0, 0, 0],
-})
+const emptyTeam = (ageGroup = 'U9') => {
+  const cfg = AGE_CONFIG[ageGroup] ?? AGE_CONFIG.U9
+  return {
+    id: uid(),
+    ageGroup,
+    periodsCount: cfg.periods,
+    periodMinutes: cfg.minutes,
+    home: true,
+    opponent: '',
+    players: [],
+    events: [],
+    period: 1,
+    clocks: Array(cfg.periods).fill(0),
+    started: false,
+    activePlayerIds: [],
+  }
+}
+
+// Houdt clocks/period in lijn met periodsCount, ook nadat iemand dat aantal
+// handmatig wijzigt of na het inladen van (mogelijk verouderde) opslag.
+function normalizeTeam(team) {
+  const n = Math.max(1, team.periodsCount || 1)
+  const playerIds = team.players.map((p) => p.id)
+  return {
+    ...team,
+    periodsCount: n,
+    clocks: Array.from({ length: n }, (_, i) => team.clocks?.[i] ?? 0),
+    period: Math.min(Math.max(team.period || 1, 1), n),
+    started: team.started ?? hadActivity(team),
+    // Opslag van vóór dit veld had geen selectie: dan telt de hele ploeg mee.
+    // Verwijderde spelers vallen automatisch weg uit de selectie.
+    activePlayerIds: (team.activePlayerIds ?? playerIds).filter((id) => playerIds.includes(id)),
+  }
+}
+
+// Voor opslag van vóór het "started"-veld: een team met al gescoorde
+// doelpunten of een gelopen klok was toen al onderweg.
+const hadActivity = (t) =>
+  Boolean(t.events?.length > 0 || (t.clocks ?? []).some((c) => c > 0))
 
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return { ...emptyMatch(), ...JSON.parse(raw) }
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      const history = Array.isArray(parsed.history) ? parsed.history : []
+      if (Array.isArray(parsed.teams) && parsed.teams.length > 0) {
+        const teams = parsed.teams.map((t) =>
+          normalizeTeam({
+            ...emptyTeam(t.ageGroup),
+            ...t,
+            started: t.started ?? hadActivity(t),
+            activePlayerIds: t.activePlayerIds ?? (t.players ?? []).map((p) => p.id),
+          }),
+        )
+        const activeTeamId = teams.some((t) => t.id === parsed.activeTeamId)
+          ? parsed.activeTeamId
+          : teams[0].id
+        return { teams, activeTeamId, history }
+      }
+      // Oud, plat matchformaat (vóór meerdere ploegen): wrap als eerste ploeg
+      // zodat bestaande matchgegevens niet verloren gaan.
+      const legacy = normalizeTeam({
+        ...emptyTeam(parsed.ageGroup ?? 'U9'),
+        ...parsed,
+        started: parsed.started ?? hadActivity(parsed),
+        activePlayerIds: parsed.activePlayerIds ?? (parsed.players ?? []).map((p) => p.id),
+      })
+      return { teams: [legacy], activeTeamId: legacy.id, history }
+    }
   } catch {
-    // onleesbare opslag: begin met een lege match
+    // onleesbare opslag: begin met een lege ploeg
   }
-  return emptyMatch()
+  const first = emptyTeam('U9')
+  return { teams: [first], activeTeamId: first.id, history: [] }
 }
 
 const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -102,13 +193,124 @@ function groupScorers(scorers) {
   return groups.map((g) => ({ name: formatNames(g.names), goals: g.goals, hattricks: g.hattricks }))
 }
 
+// Zet een (lopende of afgewerkte) match om in het data-formaat dat de
+// samenvattingsafbeelding (Summary/drawSummary) verwacht. Puur op basis van
+// de match zelf, zodat dit ook werkt voor bewaarde matchen in de historiek.
+function buildSummary(match) {
+  const opponentName = match.opponent?.trim() || OPPONENT
+  const score = {
+    us: match.events.filter((e) => e.team === 'us').length,
+    them: match.events.filter((e) => e.team === 'them').length,
+  }
+  const goalsBy = {}
+  for (const e of match.events) {
+    if (e.playerId) goalsBy[e.playerId] = (goalsBy[e.playerId] ?? 0) + 1
+  }
+  const runs = analyseRuns(match.events)
+
+  const ours = { name: TEAM, goals: score.us, ours: true }
+  const theirs = { name: opponentName, goals: score.them, ours: false }
+  const [left, right] = match.home ? [ours, theirs] : [theirs, ours]
+
+  let us = 0
+  let them = 0
+  const events = match.events.map((e) => {
+    if (e.team === 'us') us += 1
+    else them += 1
+    const player = match.players.find((p) => p.id === e.playerId)
+    const len = runs.streak[e.id]
+    const hatLabel = runs.hat[e.id] && len >= 3 ? (len === 3 ? 'hattrick' : `${len} op rij`) : null
+    return {
+      team: e.team,
+      period: e.period,
+      us,
+      them,
+      name: e.team === 'us' ? (player?.name ?? null) : null,
+      clock: e.clock,
+      hatLabel,
+    }
+  })
+
+  const scorers = groupScorers(
+    match.players
+      .map((p) => ({
+        name: p.name,
+        goals: goalsBy[p.id] ?? 0,
+        hattricks: runs.hattricks[p.id] ?? 0,
+      }))
+      .filter((s) => s.goals > 0)
+      .sort((a, b) => b.goals - a.goals || b.hattricks - a.hattricks || a.name.localeCompare(b.name)),
+  )
+
+  const unnamed = match.events.filter((e) => e.team === 'us' && !e.playerId).length
+  if (unnamed > 0) scorers.push({ name: 'Own goal', goals: unnamed, hattricks: 0 })
+
+  return {
+    date: new Date().toLocaleDateString('nl-BE', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }),
+    ourName: TEAM,
+    theirName: opponentName,
+    ageGroup: match.ageGroup,
+    periodsCount: match.periodsCount,
+    left,
+    right,
+    events,
+    scorers,
+  }
+}
+
 export default function App() {
-  const [match, setMatch] = useState(load)
+  const [state, setState] = useState(load)
+  const activeTeam = state.teams.find((t) => t.id === state.activeTeamId) ?? state.teams[0]
+  const match = activeTeam
+  // Zolang er al gescoord is of de klok al gelopen heeft, is deze match "bezig"
+  // en staan we niet toe dat er tussentijds van ploeg gewisseld wordt — dat kan
+  // enkel na "Nieuwe match".
+  const matchInProgress = match.events.length > 0 || match.clocks.some((c) => c > 0)
+
+  // Werkt op de actieve ploeg, maar laat de rest van de app ongewijzigd
+  // gewoon "setMatch((m) => ({...m, ...}))" gebruiken zoals voorheen.
+  const setMatch = (updater) => {
+    setState((s) => ({
+      ...s,
+      teams: s.teams.map((t) =>
+        t.id === s.activeTeamId
+          ? normalizeTeam(typeof updater === 'function' ? updater(t) : { ...t, ...updater })
+          : t,
+      ),
+    }))
+  }
+
+  const switchTeam = (id) => {
+    if (id === state.activeTeamId || matchInProgress) return
+    setState((s) => ({ ...s, activeTeamId: id }))
+  }
+
+  const addTeam = (ageGroup) => {
+    const team = emptyTeam(ageGroup)
+    setState((s) => ({ ...s, teams: [...s.teams, team], activeTeamId: team.id }))
+  }
+
+  const removeTeam = (id) => {
+    setState((s) => {
+      if (s.teams.length <= 1) return s
+      const teams = s.teams.filter((t) => t.id !== id)
+      const activeTeamId = s.activeTeamId === id ? teams[0].id : s.activeTeamId
+      return { ...s, teams, activeTeamId }
+    })
+  }
+
   const [running, setRunning] = useState(false)
   const [screen, setScreen] = useState('match')
-  const [asking, setAsking] = useState(false)
+  const [startingMatch, setStartingMatch] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [ending, setEnding] = useState(false)
+  const [canceling, setCanceling] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [viewingHistory, setViewingHistory] = useState(null)
   const [compactBoard, setCompactBoard] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [standalone] = useState(
@@ -120,11 +322,11 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(match))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     } catch {
-      // opslag geweigerd; de match blijft in het geheugen staan
+      // opslag geweigerd; de gegevens blijven in het geheugen staan
     }
-  }, [match])
+  }, [state])
 
   useEffect(() => {
     if (!running) return
@@ -156,8 +358,9 @@ export default function App() {
     return () => window.removeEventListener('scorebord:update-available', onUpdate)
   }, [])
 
+  const PERIODS = Array.from({ length: match.periodsCount }, (_, i) => i + 1)
   const clock = match.clocks[match.period - 1]
-  const periodSeconds = periodSecondsFor(match.ageGroup)
+  const periodSeconds = match.periodMinutes * 60
   const extraSeconds = Math.max(0, clock - periodSeconds)
   const canUndoPeriod =
     match.period > 1 && !match.events.some((event) => event.period === match.period)
@@ -189,59 +392,12 @@ export default function App() {
 
   const runs = useMemo(() => analyseRuns(match.events), [match.events])
 
-  const summary = useMemo(() => {
-    const ours = { name: TEAM, goals: score.us, ours: true }
-    const theirs = { name: opponentName, goals: score.them, ours: false }
-    const [left, right] = match.home ? [ours, theirs] : [theirs, ours]
+  const squadPlayers = useMemo(
+    () => match.players.filter((p) => match.activePlayerIds.includes(p.id)),
+    [match.players, match.activePlayerIds],
+  )
 
-    let us = 0
-    let them = 0
-    const events = match.events.map((e) => {
-      if (e.team === 'us') us += 1
-      else them += 1
-      const player = match.players.find((p) => p.id === e.playerId)
-      const len = runs.streak[e.id]
-      const hatLabel = runs.hat[e.id] && len >= 3 ? (len === 3 ? 'hattrick' : `${len} op rij`) : null
-      return {
-        team: e.team,
-        period: e.period,
-        us,
-        them,
-        name: e.team === 'us' ? (player?.name ?? null) : null,
-        clock: e.clock,
-        hatLabel,
-      }
-    })
-
-    const scorers = groupScorers(
-      match.players
-        .map((p) => ({
-          name: p.name,
-          goals: goalsBy[p.id] ?? 0,
-          hattricks: runs.hattricks[p.id] ?? 0,
-        }))
-        .filter((s) => s.goals > 0)
-        .sort((a, b) => b.goals - a.goals || b.hattricks - a.hattricks || a.name.localeCompare(b.name)),
-    )
-
-    const unnamed = match.events.filter((e) => e.team === 'us' && !e.playerId).length
-    if (unnamed > 0) scorers.push({ name: 'Own goal', goals: unnamed, hattricks: 0 })
-
-    return {
-      date: new Date().toLocaleDateString('nl-BE', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
-      ourName: TEAM,
-      theirName: opponentName,
-      ageGroup: match.ageGroup,
-      left,
-      right,
-      events,
-      scorers,
-    }
-  }, [match, score, goalsBy, runs, opponentName])
+  const summary = useMemo(() => buildSummary(match), [match])
 
   const addGoal = (team, playerId = null) => {
     setMatch((m) => ({
@@ -276,12 +432,67 @@ export default function App() {
     setMatch((m) => ({ ...m, period: m.period - 1 }))
   }
 
-  const newMatch = () => {
+  const startMatch = ({ teamId, opponent, home, periodsCount, periodMinutes, activePlayerIds }) => {
     setRunning(false)
-    setMatch((m) => ({ ...m, events: [], period: 1, clocks: [0, 0, 0, 0] }))
+    setState((s) => ({
+      ...s,
+      activeTeamId: teamId,
+      teams: s.teams.map((t) =>
+        t.id === teamId
+          ? normalizeTeam({
+              ...t,
+              opponent,
+              home,
+              periodsCount,
+              periodMinutes,
+              events: [],
+              period: 1,
+              clocks: Array(periodsCount).fill(0),
+              started: true,
+              activePlayerIds,
+            })
+          : t,
+      ),
+    }))
     setScreen('match')
-    setAsking(false)
+    setStartingMatch(false)
   }
+
+  const endMatch = () => {
+    setRunning(false)
+    const finished = { id: uid(), finishedAt: new Date().toISOString(), ...buildSummary(match) }
+    setState((s) => ({
+      ...s,
+      history: [finished, ...s.history],
+      teams: s.teams.map((t) =>
+        t.id === s.activeTeamId
+          ? normalizeTeam({
+              ...t,
+              started: false,
+              events: [],
+              period: 1,
+              clocks: Array(t.periodsCount).fill(0),
+            })
+          : t,
+      ),
+    }))
+    setEnding(false)
+  }
+
+  const cancelMatch = () => {
+    setRunning(false)
+    setMatch((m) => ({
+      ...m,
+      started: false,
+      events: [],
+      period: 1,
+      clocks: Array(m.periodsCount).fill(0),
+    }))
+    setCanceling(false)
+  }
+
+  const deleteHistoryEntry = (id) =>
+    setState((s) => ({ ...s, history: s.history.filter((h) => h.id !== id) }))
 
   const resetClock = () => {
     setRunning(false)
@@ -296,6 +507,7 @@ export default function App() {
   return (
     <div className="shell">
       <Scoreboard
+        started={match.started}
         home={match.home}
         score={score}
         opponentName={opponentName}
@@ -318,19 +530,20 @@ export default function App() {
           aria-current={screen === 'squad' ? 'page' : undefined}
         >
           <TeamIcon />
-          <span>Ploeg</span>
+          <span>Ploegen</span>
         </button>
         <button
-          className={screen === 'wedstrijd' ? 'tab is-on' : 'tab'}
-          onClick={() => setScreen('wedstrijd')}
-          aria-current={screen === 'wedstrijd' ? 'page' : undefined}
+          className={screen === 'history' ? 'tab is-on' : 'tab'}
+          onClick={() => setScreen('history')}
+          aria-current={screen === 'history' ? 'page' : undefined}
         >
-          <SettingsIcon />
-          <span>Instellingen</span>
+          <HistoryIcon />
+          <span>Historiek</span>
         </button>
       </nav>
 
       {screen === 'match' ? (
+        match.started ? (
         <>
           <div className="pane pane-play">
             <section className="clockbar">
@@ -375,17 +588,24 @@ export default function App() {
               </div>
             </section>
 
-          <HattrickBanner live={runs.live} players={match.players} />
+          <HattrickBanner live={runs.live} players={squadPlayers} />
 
           <h2 className="section-title">Wie scoorde?</h2>
-          {match.players.length === 0 && (
+          {match.players.length === 0 ? (
             <p className="empty">
-              Nog geen spelers. Voeg ze toe bij <strong>Ploeg</strong> en tik hier daarna
+              Nog geen spelers. Voeg ze toe bij <strong>Ploegen</strong> en tik hier daarna
               op de naam van de scorer.
             </p>
+          ) : (
+            squadPlayers.length === 0 && (
+              <p className="empty">
+                Niemand geselecteerd voor deze wedstrijd. Pas dit aan bij{' '}
+                <strong>Nieuwe wedstrijd</strong>.
+              </p>
+            )
           )}
           <div className="grid">
-            {match.players.map((p) => {
+            {squadPlayers.map((p) => {
               const onARoll = runs.live?.playerId === p.id ? runs.live.len : 0
               return (
                 <button
@@ -446,8 +666,11 @@ export default function App() {
             <button className="btn" onClick={() => setSharing(true)}>
               Samenvatting
             </button>
-            <button className="btn btn-quiet" onClick={() => setAsking(true)}>
-              Nieuwe match
+            <button className="btn btn-quiet" onClick={() => setEnding(true)}>
+              Beëindigen
+            </button>
+            <button className="btn btn-quiet" onClick={() => setCanceling(true)}>
+              Annuleren
             </button>
           </div>
 
@@ -457,12 +680,33 @@ export default function App() {
             <Timeline match={match} runs={runs} opponentName={opponentName} onRemove={removeEvent} />
           </div>
         </>
+        ) : (
+          <div className="pane pane-play">
+            <div className="no-match">
+              <p className="no-match-text">Nog geen wedstrijd bezig.</p>
+              <button className="btn btn-primary btn-start-hero" onClick={() => setStartingMatch(true)}>
+                Nieuwe wedstrijd
+              </button>
+            </div>
+          </div>
+        )
       ) : screen === 'squad' ? (
         <Squad
+          teams={state.teams}
+          activeTeamId={state.activeTeamId}
+          matchInProgress={matchInProgress}
+          onSwitchTeam={switchTeam}
+          onAddTeam={addTeam}
+          onRemoveTeam={removeTeam}
           players={match.players}
-          onAdd={(player) =>
-            setMatch((m) => ({ ...m, players: [...m.players, { id: uid(), ...player }] }))
-          }
+          onAdd={(player) => {
+            const id = uid()
+            setMatch((m) => ({
+              ...m,
+              players: [...m.players, { id, ...player }],
+              activePlayerIds: [...m.activePlayerIds, id],
+            }))
+          }}
           onRemove={(id) =>
             setMatch((m) => ({
               ...m,
@@ -474,16 +718,14 @@ export default function App() {
           }
         />
       ) : (
-        <Wedstrijd
-          opponent={match.opponent}
-          onOpponentChange={(opponent) => setMatch((m) => ({ ...m, opponent }))}
-          home={match.home}
-          onVenueChange={(home) => setMatch((m) => ({ ...m, home }))}
-          ageGroup={match.ageGroup}
-          onAgeGroupChange={(ageGroup) => setMatch((m) => ({ ...m, ageGroup }))}
+        <History
+          history={state.history}
+          onView={setViewingHistory}
+          onDelete={deleteHistoryEntry}
         />
       )}
 
+      <div className="foot-spacer" aria-hidden="true" />
       <footer className="foot">
         <img className="foot-logo" src={CLUB_LOGO} alt="" />
         <p>v{APP_VERSION}</p>
@@ -491,13 +733,16 @@ export default function App() {
 
       {sharing && <Summary data={summary} onClose={() => setSharing(false)} />}
 
-      {asking && (
-        <Confirm
-          title="Nieuwe match starten?"
-          body={`De stand ${score.us}–${score.them} en de hele tijdslijn worden gewist. De spelerslijst blijft staan.`}
-          confirmLabel="Wissen en starten"
-          onConfirm={newMatch}
-          onCancel={() => setAsking(false)}
+      {viewingHistory && (
+        <Summary data={viewingHistory} onClose={() => setViewingHistory(null)} />
+      )}
+
+      {startingMatch && (
+        <StartMatch
+          teams={state.teams}
+          defaultTeamId={state.activeTeamId}
+          onStart={startMatch}
+          onCancel={() => setStartingMatch(false)}
         />
       )}
 
@@ -508,6 +753,27 @@ export default function App() {
           confirmLabel="Terug op nul"
           onConfirm={resetClock}
           onCancel={() => setResetting(false)}
+        />
+      )}
+
+      {ending && (
+        <Confirm
+          title="Wedstrijd beëindigen?"
+          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} wordt bewaard in de Historiek.`}
+          confirmLabel="Beëindigen"
+          onConfirm={endMatch}
+          onCancel={() => setEnding(false)}
+        />
+      )}
+
+      {canceling && (
+        <Confirm
+          title="Wedstrijd annuleren?"
+          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} gaat verloren en wordt niet bewaard in de Historiek.`}
+          confirmLabel="Annuleren"
+          cancelLabel="Verdergaan"
+          onConfirm={cancelMatch}
+          onCancel={() => setCanceling(false)}
         />
       )}
 
@@ -621,7 +887,7 @@ function Summary({ data, onClose }) {
   )
 }
 
-function Confirm({ title, body, confirmLabel, onConfirm, onCancel }) {
+function Confirm({ title, body, confirmLabel, cancelLabel = 'Annuleren', onConfirm, onCancel }) {
   const panel = useRef(null)
 
   useEffect(() => {
@@ -670,7 +936,7 @@ function Confirm({ title, body, confirmLabel, onConfirm, onCancel }) {
         <p>{body}</p>
         <div className="dialog-actions">
           <button className="btn" onClick={onCancel}>
-            Annuleren
+            {cancelLabel}
           </button>
           <button className="btn btn-primary" onClick={onConfirm}>
             {confirmLabel}
@@ -696,10 +962,20 @@ function HattrickBanner({ live, players }) {
   )
 }
 
-function Scoreboard({ home, score, opponentName, ageGroup, compact }) {
+function Scoreboard({ started, home, score, opponentName, ageGroup, compact }) {
   const ours = { name: TEAM, goals: score.us, ours: true }
   const theirs = { name: opponentName, goals: score.them, ours: false }
   const [left, right] = home ? [ours, theirs] : [theirs, ours]
+
+  if (!started) {
+    return (
+      <header className={compact ? 'board is-compact' : 'board'}>
+        <div className="board-row board-row-idle">
+          <span className="team-name team-name-ours">{TEAM} – Scorebord</span>
+        </div>
+      </header>
+    )
+  }
 
   return (
     <header className={compact ? 'board is-compact' : 'board'}>
@@ -741,7 +1017,8 @@ function Timeline({ match, runs, opponentName, onRemove }) {
     const player = match.players.find((p) => p.id === e.playerId)
     return { ...e, us, them, name: player?.name ?? null }
   })
-  const visiblePeriods = PERIODS.filter(
+  const periods = Array.from({ length: match.periodsCount }, (_, i) => i + 1)
+  const visiblePeriods = periods.filter(
     (period) => period === match.period || rows.some((row) => row.period === period),
   )
 
@@ -822,8 +1099,34 @@ function LastAction({ match, score, opponentName, onUndo }) {
   )
 }
 
-function Squad({ players, onAdd, onRemove }) {
+function AgeOptions() {
+  const formats = [...new Set(AGE_ORDER.map((age) => AGE_CONFIG[age].format))]
+  return formats.map((format) => (
+    <optgroup key={format} label={FORMAT_LABELS[format]}>
+      {AGE_ORDER.filter((age) => AGE_CONFIG[age].format === format).map((age) => (
+        <option key={age} value={age}>
+          {age}
+        </option>
+      ))}
+    </optgroup>
+  ))
+}
+
+function Squad({
+  teams,
+  activeTeamId,
+  matchInProgress,
+  onSwitchTeam,
+  onAddTeam,
+  onRemoveTeam,
+  players,
+  onAdd,
+  onRemove,
+}) {
   const [name, setName] = useState('')
+  const [newTeamAge, setNewTeamAge] = useState('U9')
+  const [addingTeam, setAddingTeam] = useState(false)
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
 
   const submit = () => {
     if (!name.trim()) return
@@ -831,9 +1134,67 @@ function Squad({ players, onAdd, onRemove }) {
     setName('')
   }
 
+  const addTeam = () => {
+    onAddTeam(newTeamAge)
+    setAddingTeam(false)
+  }
+
   return (
     <section className="pane-squad">
-      <h2 className="section-title">Ploeg</h2>
+      <h2 className="section-title">Ploegen</h2>
+
+      <div className="team-switch">
+        {teams.map((t) => {
+          const disabled = t.id !== activeTeamId && matchInProgress
+          return (
+            <button
+              key={t.id}
+              className={t.id === activeTeamId ? 'team-chip is-on' : 'team-chip'}
+              onClick={() => onSwitchTeam(t.id)}
+              disabled={disabled}
+              title={disabled ? 'Beëindig eerst de huidige match om te wisselen' : undefined}
+              aria-pressed={t.id === activeTeamId}
+            >
+              {t.ageGroup}
+            </button>
+          )
+        })}
+        <button
+          className={addingTeam ? 'team-chip team-chip-add is-on' : 'team-chip team-chip-add'}
+          onClick={() => setAddingTeam((v) => !v)}
+          aria-label="Ploeg toevoegen"
+          aria-expanded={addingTeam}
+          title="Ploeg toevoegen"
+        >
+          <PlusIcon />
+        </button>
+      </div>
+
+      {addingTeam && (
+        <div className="panel-card">
+          <span className="choice-label">Nieuwe ploeg</span>
+          <div className="row row-flush">
+            <select
+              className="field"
+              value={newTeamAge}
+              onChange={(e) => setNewTeamAge(e.target.value)}
+              aria-label="Leeftijdscategorie nieuwe ploeg"
+            >
+              <AgeOptions />
+            </select>
+            <button
+              className="btn btn-primary btn-icon"
+              onClick={addTeam}
+              aria-label="Ploeg toevoegen bevestigen"
+              title="Ploeg toevoegen"
+            >
+              <PlusIcon />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <h2 className="section-title">Spelers</h2>
       <div className="panel-card">
         <div className="row row-flush">
           <input
@@ -873,6 +1234,86 @@ function Squad({ players, onAdd, onRemove }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {teams.length > 1 && !matchInProgress && (
+        <button
+          className="btn btn-quiet btn-remove-team"
+          onClick={() => setConfirmingRemove(true)}
+        >
+          <TrashIcon />
+          Deze ploeg verwijderen
+        </button>
+      )}
+
+      {confirmingRemove && (
+        <Confirm
+          title="Ploeg verwijderen?"
+          body="De spelerslijst en de hele matchgeschiedenis van deze ploeg gaan verloren."
+          confirmLabel="Verwijderen"
+          onConfirm={() => {
+            onRemoveTeam(activeTeamId)
+            setConfirmingRemove(false)
+          }}
+          onCancel={() => setConfirmingRemove(false)}
+        />
+      )}
+    </section>
+  )
+}
+
+function History({ history, onView, onDelete }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(null)
+
+  return (
+    <section className="pane-history">
+      <h2 className="section-title">Historiek</h2>
+      {history.length === 0 ? (
+        <p className="empty">
+          Nog geen afgewerkte wedstrijden. Druk na een wedstrijd op <strong>Beëindigen</strong>{' '}
+          om ze hier te bewaren.
+        </p>
+      ) : (
+        <ul className="history-list">
+          {history.map((h) => (
+            <li key={h.id}>
+              <button className="history-item" onClick={() => onView(h)}>
+                <span className="history-item-score">
+                  <span className={h.left.ours ? 'is-ours' : ''}>{h.left.goals}</span>
+                  <span className="history-item-dash">–</span>
+                  <span className={h.right.ours ? 'is-ours' : ''}>{h.right.goals}</span>
+                </span>
+                <span className="history-item-info">
+                  <span className="history-item-opponent">{h.theirName}</span>
+                  <span className="history-item-meta">
+                    {h.ageGroup} · {h.date}
+                  </span>
+                </span>
+              </button>
+              <button
+                className="btn btn-quiet btn-icon"
+                onClick={() => setConfirmingDelete(h)}
+                aria-label={`Wedstrijd tegen ${h.theirName} verwijderen`}
+                title="Verwijderen"
+              >
+                <TrashIcon />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {confirmingDelete && (
+        <Confirm
+          title="Wedstrijd verwijderen?"
+          body={`De bewaarde wedstrijd tegen ${confirmingDelete.theirName} (${confirmingDelete.date}) wordt definitief verwijderd uit de Historiek.`}
+          confirmLabel="Verwijderen"
+          onConfirm={() => {
+            onDelete(confirmingDelete.id)
+            setConfirmingDelete(null)
+          }}
+          onCancel={() => setConfirmingDelete(null)}
+        />
       )}
     </section>
   )
@@ -988,12 +1429,18 @@ function TeamIcon() {
   )
 }
 
-function SettingsIcon() {
+function HistoryIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="8" cy="17" r="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path d="M3.5 4.5v3.5H7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 8v4.5l3 2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -1008,76 +1455,234 @@ function InfoIcon() {
   )
 }
 
-function Wedstrijd({ opponent, onOpponentChange, home, onVenueChange, ageGroup, onAgeGroupChange }) {
+const clampNumber = (value, min, max) => {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n)) return min
+  return Math.min(max, Math.max(min, n))
+}
+
+function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
+  const panel = useRef(null)
+  const [teamId, setTeamId] = useState(defaultTeamId)
+  const team = teams.find((t) => t.id === teamId) ?? teams[0]
+  const [opponent, setOpponent] = useState('')
+  const [home, setHome] = useState(team.home)
+  const [periodsCount, setPeriodsCount] = useState(team.periodsCount)
+  const [periodMinutes, setPeriodMinutes] = useState(team.periodMinutes)
+  const [activePlayerIds, setActivePlayerIds] = useState(team.players.map((p) => p.id))
+
+  const selectTeam = (id) => {
+    const t = teams.find((candidate) => candidate.id === id)
+    if (!t) return
+    setTeamId(id)
+    setOpponent('')
+    setHome(t.home)
+    setPeriodsCount(t.periodsCount)
+    setPeriodMinutes(t.periodMinutes)
+    setActivePlayerIds(t.players.map((p) => p.id))
+  }
+
+  const togglePlayer = (id) =>
+    setActivePlayerIds((ids) =>
+      ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id],
+    )
+
+  const cfg = AGE_CONFIG[team.ageGroup] ?? AGE_CONFIG.U9
+  const isDefault = periodsCount === cfg.periods && periodMinutes === cfg.minutes
+  const resetDefaults = () => {
+    setPeriodsCount(cfg.periods)
+    setPeriodMinutes(cfg.minutes)
+  }
+
+  const us = team.events.filter((e) => e.team === 'us').length
+  const them = team.events.length - us
+  const hasProgress = team.events.length > 0 || team.clocks.some((c) => c > 0)
+
+  const start = () =>
+    onStart({
+      teamId,
+      opponent: opponent.trim(),
+      home,
+      periodsCount,
+      periodMinutes,
+      activePlayerIds,
+    })
+
+  useEffect(() => {
+    panel.current?.focus()
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        onCancel()
+        return
+      }
+      if (e.key !== 'Tab') return
+      // Houd de focus binnen het venster zolang het openstaat.
+      const focusable = panel.current?.querySelectorAll('button, input, a[href]') ?? []
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    const scroll = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = scroll
+    }
+  }, [onCancel])
+
   return (
-    <section className="pane-squad">
-      <h2 className="section-title">Instellingen</h2>
+    <div className="overlay" onClick={onCancel}>
+      <div
+        className="dialog dialog-wide"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="start-match-title"
+        tabIndex={-1}
+        ref={panel}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="start-match-title">Nieuwe wedstrijd</h2>
 
-      <div className="panel-card">
-        <label className="choice-label" htmlFor="opponent-name">
-          Tegenstander
-        </label>
-        <input
-          id="opponent-name"
-          className="field"
-          value={opponent}
-          onChange={(e) => onOpponentChange(e.target.value)}
-          placeholder={OPPONENT}
-          aria-label="Naam tegenstander"
-        />
-      </div>
-
-      <div className="panel-card choice-row">
-        <span className="choice-label">{TEAM} speelt</span>
-        <div className="periods">
-          <button
-            className={home ? 'per is-on' : 'per'}
-            onClick={() => onVenueChange(true)}
-            aria-pressed={home}
-          >
-            Thuis
-          </button>
-          <button
-            className={home ? 'per' : 'per is-on'}
-            onClick={() => onVenueChange(false)}
-            aria-pressed={!home}
-          >
-            Uit
-          </button>
+        <div className="team-switch">
+          {teams.map((t) => (
+            <button
+              key={t.id}
+              className={t.id === teamId ? 'team-chip is-on' : 'team-chip'}
+              onClick={() => selectTeam(t.id)}
+              aria-pressed={t.id === teamId}
+            >
+              {t.ageGroup}
+            </button>
+          ))}
         </div>
-      </div>
 
-      <div className="panel-card">
-        <div className="choice-row">
-          <span className="choice-label">Leeftijdscategorie</span>
+        <div className="panel-card">
+          <label className="choice-label" htmlFor="new-match-opponent">
+            Tegenstander
+          </label>
+          <input
+            id="new-match-opponent"
+            className="field"
+            value={opponent}
+            onChange={(e) => setOpponent(e.target.value)}
+            placeholder={OPPONENT}
+            aria-label="Naam tegenstander"
+          />
+        </div>
+
+        <div className="panel-card choice-row">
+          <span className="choice-label">{TEAM} speelt</span>
           <div className="periods">
             <button
-              className={ageGroup === 'U7' ? 'per is-on' : 'per'}
-              onClick={() => onAgeGroupChange('U7')}
-              aria-pressed={ageGroup === 'U7'}
+              className={home ? 'per is-on' : 'per'}
+              onClick={() => setHome(true)}
+              aria-pressed={home}
             >
-              U7 · 4×10&apos;
+              Thuis
             </button>
             <button
-              className={ageGroup === 'U9' ? 'per is-on' : 'per'}
-              onClick={() => onAgeGroupChange('U9')}
-              aria-pressed={ageGroup === 'U9'}
+              className={home ? 'per' : 'per is-on'}
+              onClick={() => setHome(false)}
+              aria-pressed={!home}
             >
-              U9 · 4×15&apos;
+              Uit
             </button>
           </div>
         </div>
 
+        <div className="panel-card">
+          <span className="choice-label">
+            Periodes ({team.ageGroup} · {FORMAT_LABELS[cfg.format]})
+          </span>
+          <div className="row row-flush">
+            <label className="field-group">
+              <span className="field-group-label">Periodes</span>
+              <input
+                className="field"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max="12"
+                value={periodsCount}
+                onChange={(e) => setPeriodsCount(clampNumber(e.target.value, 1, 12))}
+                aria-label="Aantal periodes"
+              />
+            </label>
+            <label className="field-group">
+              <span className="field-group-label">Minuten per periode</span>
+              <input
+                className="field"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max="90"
+                value={periodMinutes}
+                onChange={(e) => setPeriodMinutes(clampNumber(e.target.value, 1, 90))}
+                aria-label="Minuten per periode"
+              />
+            </label>
+          </div>
+          {!isDefault && (
+            <button className="btn btn-quiet btn-reset-defaults" onClick={resetDefaults}>
+              Standaard herstellen ({cfg.periods} × {cfg.minutes}&apos;)
+            </button>
+          )}
+        </div>
+
+        <div className="panel-card">
+          <span className="choice-label">Wie speelt mee?</span>
+          {team.players.length === 0 ? (
+            <p className="empty">Voeg eerst spelers toe bij Ploegen.</p>
+          ) : (
+            <div className="player-select">
+              {team.players.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={activePlayerIds.includes(p.id) ? 'team-chip is-on' : 'team-chip'}
+                  onClick={() => togglePlayer(p.id)}
+                  aria-pressed={activePlayerIds.includes(p.id)}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <a
           className="rules-link"
-          href={RULES_URL[ageGroup]}
+          href={FORMAT_RULES_URL[cfg.format]}
           target="_blank"
           rel="noreferrer"
         >
           <InfoIcon />
-          Spelreglement {ageGroup} bekijken (pdf)
+          Spelreglement {cfg.format} bekijken (pdf)
         </a>
+
+        {hasProgress && (
+          <p className="empty">
+            De huidige stand ({us}–{them}) en tijdslijn van deze ploeg worden gewist.
+          </p>
+        )}
+
+        <div className="dialog-actions">
+          <button className="btn" onClick={onCancel}>
+            Annuleren
+          </button>
+          <button className="btn btn-primary" onClick={start}>
+            Starten
+          </button>
+        </div>
       </div>
-    </section>
+    </div>
   )
 }

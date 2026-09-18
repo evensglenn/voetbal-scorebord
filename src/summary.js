@@ -65,7 +65,8 @@ function computeLayout(d) {
   const scorersContentH = d.scorers.length === 0 ? 66 : d.scorers.length * SCORER_ROW_H
   const scorersEnd = scorersTop + 66 + scorersContentH
 
-  const periods = [1, 2, 3, 4].filter((p) => d.events.some((e) => e.period === p))
+  const allPeriods = Array.from({ length: d.periodsCount || 4 }, (_, i) => i + 1)
+  const periods = allPeriods.filter((p) => d.events.some((e) => e.period === p))
   const timelineTop = scorersEnd + SECTION_GAP
   let timelineContentH = 0
   if (periods.length > 0) {
@@ -169,11 +170,12 @@ function drawChart(ctx, d, top) {
   ctx.textAlign = 'left'
   ctx.fillText('Zo verliep de score', PAD, top)
 
+  const periodsCount = d.periodsCount || 4
   const x0 = PAD
   const x1 = DESIGN_W - PAD
   const y0 = top + 50
   const y1 = top + 276
-  const band = (x1 - x0) / 4
+  const band = (x1 - x0) / periodsCount
   const max = Math.max(d.left.goals, d.right.goals, 2)
   const yFor = (v) => y1 - (v / max) * (y1 - y0)
 
@@ -196,7 +198,7 @@ function drawChart(ctx, d, top) {
 
   // Periodes
   ctx.font = font(500, 26)
-  for (let p = 1; p < 4; p++) {
+  for (let p = 1; p < periodsCount; p++) {
     ctx.strokeStyle = GRID
     ctx.lineWidth = 2
     ctx.beginPath()
@@ -204,7 +206,7 @@ function drawChart(ctx, d, top) {
     ctx.lineTo(x0 + p * band, y1)
     ctx.stroke()
   }
-  for (let p = 0; p < 4; p++) {
+  for (let p = 0; p < periodsCount; p++) {
     ctx.fillStyle = FADED
     ctx.textAlign = 'center'
     ctx.fillText(`P${p + 1}`, x0 + (p + 0.5) * band, y1 + 52)
@@ -212,7 +214,7 @@ function drawChart(ctx, d, top) {
 
   // Elk doelpunt krijgt een plaats binnen zijn periode.
   const points = []
-  for (let p = 1; p <= 4; p++) {
+  for (let p = 1; p <= periodsCount; p++) {
     const inPeriod = d.events.filter((e) => e.period === p)
     inPeriod.forEach((e, i) => {
       points.push({ ...e, x: x0 + (p - 1) * band + ((i + 1) * band) / (inPeriod.length + 1) })
