@@ -4,6 +4,7 @@
   --paper: #ffffff;
   --club: #e4600a;
   --away: #59646f;
+  --danger: #d1332c;
   --muted: #586269;
   --line: rgba(17, 22, 27, 0.16);
   --line-soft: rgba(17, 22, 27, 0.08);
@@ -32,7 +33,11 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  min-height: 100dvh;
+  /* 100svh (kleinste zichtbare hoogte, met adresbalk zichtbaar) i.p.v.
+     100dvh: zo kan de footer nooit net buiten beeld vallen doordat de
+     browser-UI van het toestel groter uitvalt dan verwacht, wat op sommige
+     Android-toestellen (bv. Samsung/Chrome) ongewenst scrollen gaf. */
+  min-height: 100svh;
 }
 
 /* Duwt de footer nooit hoger dan net boven de tabbalk, ook als de pagina
@@ -429,6 +434,12 @@ body {
 .btn-away {
   background: var(--away);
   border-color: var(--away);
+  color: var(--paper);
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
   color: var(--paper);
 }
 

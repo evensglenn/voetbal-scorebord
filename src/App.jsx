@@ -341,9 +341,15 @@ export default function App() {
   }, [running])
 
   useEffect(() => {
+    // De sticky kop zelf krimpt zo'n 70px wanneer hij compact wordt (minder
+    // padding, kleinere cijfers). Die krimp verschuift de pagina-inhoud, wat
+    // op zijn beurt scrollY kan doen meebewegen (scroll anchoring) — met een
+    // te kleine dode zone tussen de twee drempels ontstond daardoor een lus
+    // die de kop constant liet "flippen" tussen groot en klein. De zone moet
+    // dus ruim groter zijn dan die krimp.
     const onScroll = () => {
       setCompactBoard((compact) =>
-        compact ? window.scrollY > 12 : window.scrollY > 56,
+        compact ? window.scrollY > 12 : window.scrollY > 120,
       )
     }
 
@@ -647,8 +653,8 @@ export default function App() {
               <button
                 className="btn btn-icon btn-undo"
                 onClick={undoPeriodChange}
-                aria-label="Ongedaan maken"
-                title="Ongedaan maken"
+                aria-label="Maak ongedaan"
+                title="Maak ongedaan"
               >
                 <UndoIcon />
               </button>
@@ -667,10 +673,10 @@ export default function App() {
               Samenvatting
             </button>
             <button className="btn btn-quiet" onClick={() => setEnding(true)}>
-              Beëindigen
+              Beëindig
             </button>
             <button className="btn btn-quiet" onClick={() => setCanceling(true)}>
-              Annuleren
+              Annuleer
             </button>
           </div>
 
@@ -750,7 +756,8 @@ export default function App() {
         <Confirm
           title="Klok terug op nul zetten?"
           body={`De tijd van periode ${match.period} (${mmss(clock)}) gaat verloren.`}
-          confirmLabel="Terug op nul"
+          confirmLabel="Ja, terug op nul"
+          danger
           onConfirm={resetClock}
           onCancel={() => setResetting(false)}
         />
@@ -760,7 +767,8 @@ export default function App() {
         <Confirm
           title="Wedstrijd beëindigen?"
           body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} wordt bewaard in de Historiek.`}
-          confirmLabel="Beëindigen"
+          confirmLabel="Ja, beëindig"
+          danger
           onConfirm={endMatch}
           onCancel={() => setEnding(false)}
         />
@@ -770,8 +778,8 @@ export default function App() {
         <Confirm
           title="Wedstrijd annuleren?"
           body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} gaat verloren en wordt niet bewaard in de Historiek.`}
-          confirmLabel="Annuleren"
-          cancelLabel="Verdergaan"
+          confirmLabel="Ja, annuleer"
+          danger
           onConfirm={cancelMatch}
           onCancel={() => setCanceling(false)}
         />
@@ -781,7 +789,7 @@ export default function App() {
         <div className="update-toast" role="status">
           <span>Nieuwe versie beschikbaar</span>
           <button className="btn btn-primary" onClick={() => window.location.reload()}>
-            Vernieuwen
+            Vernieuw
           </button>
         </div>
       )}
@@ -869,16 +877,16 @@ function Summary({ data, onClose }) {
 
         <div className="dialog-actions">
           <button className="btn" onClick={onClose}>
-            Sluiten
+            Sluit
           </button>
           {url && !canShare && (
             <button className="btn btn-primary" onClick={save}>
-              Bewaren
+              Bewaar
             </button>
           )}
           {canShare && (
             <button className="btn btn-primary" onClick={share}>
-              Delen
+              Deel
             </button>
           )}
         </div>
@@ -887,7 +895,7 @@ function Summary({ data, onClose }) {
   )
 }
 
-function Confirm({ title, body, confirmLabel, cancelLabel = 'Annuleren', onConfirm, onCancel }) {
+function Confirm({ title, body, confirmLabel, cancelLabel = 'Nee', danger, onConfirm, onCancel }) {
   const panel = useRef(null)
 
   useEffect(() => {
@@ -938,7 +946,10 @@ function Confirm({ title, body, confirmLabel, cancelLabel = 'Annuleren', onConfi
           <button className="btn" onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button className="btn btn-primary" onClick={onConfirm}>
+          <button
+            className={danger ? 'btn btn-danger' : 'btn btn-primary'}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </button>
         </div>
@@ -1000,6 +1011,8 @@ function Scoreboard({ started, home, score, opponentName, ageGroup, compact }) {
 }
 
 function Timeline({ match, runs, opponentName, onRemove }) {
+  const [removing, setRemoving] = useState(null)
+
   if (match.events.length === 0) {
     return (
       <>
@@ -1055,8 +1068,8 @@ function Timeline({ match, runs, opponentName, onRemove }) {
                     )}
                     <button
                       className="tl-del"
-                      onClick={() => onRemove(r.id)}
-                      aria-label="Dit doelpunt verwijderen"
+                      onClick={() => setRemoving(r)}
+                      aria-label="Verwijder dit doelpunt"
                     >
                       ×
                     </button>
@@ -1067,6 +1080,22 @@ function Timeline({ match, runs, opponentName, onRemove }) {
           )
         })}
       </ol>
+
+      {removing && (
+        <Confirm
+          title="Doelpunt verwijderen?"
+          body={`${removing.us}–${removing.them}, ${
+            removing.team === 'us' ? (removing.name ?? 'Own goal') : opponentName
+          } wordt uit de tijdslijn verwijderd en de stand wordt herberekend.`}
+          confirmLabel="Ja, verwijder"
+          danger
+          onConfirm={() => {
+            onRemove(removing.id)
+            setRemoving(null)
+          }}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
     </>
   )
 }
@@ -1090,8 +1119,8 @@ function LastAction({ match, score, opponentName, onUndo }) {
       <button
         className="btn btn-icon btn-undo"
         onClick={onUndo}
-        aria-label="Ongedaan maken"
-        title="Ongedaan maken"
+        aria-label="Maak ongedaan"
+        title="Maak ongedaan"
       >
         <UndoIcon />
       </button>
@@ -1127,6 +1156,7 @@ function Squad({
   const [newTeamAge, setNewTeamAge] = useState('U9')
   const [addingTeam, setAddingTeam] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [removingPlayer, setRemovingPlayer] = useState(null)
 
   const submit = () => {
     if (!name.trim()) return
@@ -1162,9 +1192,9 @@ function Squad({
         <button
           className={addingTeam ? 'team-chip team-chip-add is-on' : 'team-chip team-chip-add'}
           onClick={() => setAddingTeam((v) => !v)}
-          aria-label="Ploeg toevoegen"
+          aria-label="Voeg ploeg toe"
           aria-expanded={addingTeam}
-          title="Ploeg toevoegen"
+          title="Voeg ploeg toe"
         >
           <PlusIcon />
         </button>
@@ -1185,8 +1215,8 @@ function Squad({
             <button
               className="btn btn-primary btn-icon"
               onClick={addTeam}
-              aria-label="Ploeg toevoegen bevestigen"
-              title="Ploeg toevoegen"
+              aria-label="Bevestig nieuwe ploeg"
+              title="Voeg ploeg toe"
             >
               <PlusIcon />
             </button>
@@ -1208,8 +1238,8 @@ function Squad({
           <button
             className="btn btn-primary btn-icon"
             onClick={submit}
-            aria-label="Speler toevoegen"
-            title="Speler toevoegen"
+            aria-label="Voeg speler toe"
+            title="Voeg speler toe"
           >
             <PlusIcon />
           </button>
@@ -1225,9 +1255,9 @@ function Squad({
               <span className="squad-name">{p.name}</span>
               <button
                 className="btn btn-quiet btn-icon"
-                onClick={() => onRemove(p.id)}
-                aria-label={`${p.name} verwijderen`}
-                title={`${p.name} verwijderen`}
+                onClick={() => setRemovingPlayer(p)}
+                aria-label={`Verwijder ${p.name}`}
+                title={`Verwijder ${p.name}`}
               >
                 <TrashIcon />
               </button>
@@ -1242,15 +1272,30 @@ function Squad({
           onClick={() => setConfirmingRemove(true)}
         >
           <TrashIcon />
-          Deze ploeg verwijderen
+          Verwijder deze ploeg
         </button>
+      )}
+
+      {removingPlayer && (
+        <Confirm
+          title="Speler verwijderen?"
+          body={`${removingPlayer.name} wordt uit de ploeg verwijderd. Eerder gescoorde doelpunten blijven in de tijdslijn staan, maar zonder naam.`}
+          confirmLabel="Ja, verwijder"
+          danger
+          onConfirm={() => {
+            onRemove(removingPlayer.id)
+            setRemovingPlayer(null)
+          }}
+          onCancel={() => setRemovingPlayer(null)}
+        />
       )}
 
       {confirmingRemove && (
         <Confirm
           title="Ploeg verwijderen?"
           body="De spelerslijst en de hele matchgeschiedenis van deze ploeg gaan verloren."
-          confirmLabel="Verwijderen"
+          confirmLabel="Ja, verwijder"
+          danger
           onConfirm={() => {
             onRemoveTeam(activeTeamId)
             setConfirmingRemove(false)
@@ -1270,7 +1315,7 @@ function History({ history, onView, onDelete }) {
       <h2 className="section-title">Historiek</h2>
       {history.length === 0 ? (
         <p className="empty">
-          Nog geen afgewerkte wedstrijden. Druk na een wedstrijd op <strong>Beëindigen</strong>{' '}
+          Nog geen afgewerkte wedstrijden. Druk na een wedstrijd op <strong>Beëindig</strong>{' '}
           om ze hier te bewaren.
         </p>
       ) : (
@@ -1293,8 +1338,8 @@ function History({ history, onView, onDelete }) {
               <button
                 className="btn btn-quiet btn-icon"
                 onClick={() => setConfirmingDelete(h)}
-                aria-label={`Wedstrijd tegen ${h.theirName} verwijderen`}
-                title="Verwijderen"
+                aria-label={`Verwijder wedstrijd tegen ${h.theirName}`}
+                title="Verwijder"
               >
                 <TrashIcon />
               </button>
@@ -1307,7 +1352,8 @@ function History({ history, onView, onDelete }) {
         <Confirm
           title="Wedstrijd verwijderen?"
           body={`De bewaarde wedstrijd tegen ${confirmingDelete.theirName} (${confirmingDelete.date}) wordt definitief verwijderd uit de Historiek.`}
-          confirmLabel="Verwijderen"
+          confirmLabel="Ja, verwijder"
+          danger
           onConfirm={() => {
             onDelete(confirmingDelete.id)
             setConfirmingDelete(null)
@@ -1632,7 +1678,7 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
           </div>
           {!isDefault && (
             <button className="btn btn-quiet btn-reset-defaults" onClick={resetDefaults}>
-              Standaard herstellen ({cfg.periods} × {cfg.minutes}&apos;)
+              Herstel standaard ({cfg.periods} × {cfg.minutes}&apos;)
             </button>
           )}
         </div>
@@ -1676,10 +1722,10 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
 
         <div className="dialog-actions">
           <button className="btn" onClick={onCancel}>
-            Annuleren
+            Annuleer
           </button>
           <button className="btn btn-primary" onClick={start}>
-            Starten
+            Start
           </button>
         </div>
       </div>
