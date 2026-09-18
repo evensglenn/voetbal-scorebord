@@ -692,7 +692,7 @@ function Scoreboard({ home, score, opponentName, ageGroup, compact }) {
     <header className={compact ? 'board is-compact' : 'board'}>
       <div className="board-row">
         <div className="side">
-          <span className="team-name">{left.name}</span>
+          <span className={left.ours ? 'team-name team-name-ours' : 'team-name'}>{left.name}</span>
           <span className={left.ours ? 'goals goals-ours' : 'goals'}>{left.goals}</span>
         </div>
         <div className="board-mid">
@@ -702,7 +702,7 @@ function Scoreboard({ home, score, opponentName, ageGroup, compact }) {
           <span className="age-badge">{ageGroup}</span>
         </div>
         <div className="side side-right">
-          <span className="team-name">{right.name}</span>
+          <span className={right.ours ? 'team-name team-name-ours' : 'team-name'}>{right.name}</span>
           <span className={right.ours ? 'goals goals-ours' : 'goals'}>{right.goals}</span>
         </div>
       </div>

@@ -61,6 +61,7 @@ body {
 }
 
 .team-name {
+  max-width: 100%;
   overflow: hidden;
   font-size: 1.2rem;
   font-weight: 500;
@@ -69,6 +70,10 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: font-size 180ms ease;
+}
+
+.team-name-ours {
+  color: var(--club);
 }
 
 .goals {
@@ -831,7 +836,7 @@ input:focus-visible {
   }
 }
 
-@media (max-width: 26rem) {
+@media (max-width: 20rem) {
   .period-change,
   .last-action {
     align-items: stretch;
