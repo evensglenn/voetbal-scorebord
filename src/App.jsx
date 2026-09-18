@@ -218,7 +218,7 @@ export default function App() {
     )
 
     const unnamed = match.events.filter((e) => e.team === 'us' && !e.playerId).length
-    if (unnamed > 0) scorers.push({ name: 'Zonder naam', goals: unnamed, hattricks: 0 })
+    if (unnamed > 0) scorers.push({ name: 'Owngoal', goals: unnamed, hattricks: 0 })
 
     return {
       date: new Date().toLocaleDateString('nl-BE', {
@@ -398,7 +398,7 @@ export default function App() {
               )
             })}
             <button className="scorer scorer-neutral" onClick={() => addGoal('us', null)}>
-              Zonder naam
+              Owngoal
             </button>
           </div>
 
@@ -454,8 +454,6 @@ export default function App() {
       ) : screen === 'squad' ? (
         <Squad
           players={match.players}
-          goalsBy={goalsBy}
-          hattricks={runs.hattricks}
           onAdd={(player) =>
             setMatch((m) => ({ ...m, players: [...m.players, { id: uid(), ...player }] }))
           }
@@ -757,7 +755,7 @@ function Timeline({ match, runs, opponentName, onRemove }) {
                       {r.us}–{r.them}
                     </span>
                     <span className="tl-who">
-                      {r.team === 'us' ? (r.name ?? 'Doelpunt') : opponentName}
+                      {r.team === 'us' ? (r.name ?? 'Owngoal') : opponentName}
                       {r.clock ? <span className="tl-min"> {mmss(r.clock)}</span> : null}
                     </span>
                     {inHat && len >= 3 && (
@@ -786,8 +784,7 @@ function LastAction({ match, score, opponentName, onUndo }) {
   if (!last) return null
 
   const player = match.players.find((candidate) => candidate.id === last.playerId)
-  const label =
-    last.team === 'them' ? opponentName : player?.name ? player.name : 'Doelpunt zonder naam'
+  const label = last.team === 'them' ? opponentName : player?.name ? player.name : 'Owngoal'
 
   return (
     <section className="last-action" aria-live="polite">
@@ -810,7 +807,7 @@ function LastAction({ match, score, opponentName, onUndo }) {
   )
 }
 
-function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
+function Squad({ players, onAdd, onRemove }) {
   const [name, setName] = useState('')
   const [number, setNumber] = useState('')
 
@@ -861,14 +858,6 @@ function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
             <li key={p.id}>
               {p.number !== '' && <span className="shirt">{p.number}</span>}
               <span className="squad-name">{p.name}</span>
-              <span className="squad-goals">
-                {goalsBy[p.id] ? `${goalsBy[p.id]}×` : ''}
-                {hattricks[p.id] > 0 && (
-                  <span className="squad-hat">
-                    {hattricks[p.id] === 1 ? 'hattrick' : `${hattricks[p.id]} hattricks`}
-                  </span>
-                )}
-              </span>
               <button
                 className="btn btn-quiet btn-icon"
                 onClick={() => onRemove(p.id)}

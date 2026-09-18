@@ -120,11 +120,13 @@ export function drawSummary(ctx, d, logo) {
 
   // Uitslag
   const scoreY = 250
+  const NAME_FADED = 'rgba(255, 255, 255, 0.82)'
   ctx.font = font(500, 40)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.82)'
   ctx.textAlign = 'left'
+  ctx.fillStyle = d.left.ours ? CLUB : NAME_FADED
   ctx.fillText(d.left.name, PAD, 168)
   ctx.textAlign = 'right'
+  ctx.fillStyle = d.right.ours ? CLUB : NAME_FADED
   ctx.fillText(d.right.name, DESIGN_W - PAD, 168)
 
   ctx.font = font(700, 150)
@@ -332,7 +334,7 @@ function drawTimeline(ctx, d, layout) {
 
       ctx.fillStyle = PAPER
       ctx.font = font(500, 34)
-      const who = e.team === 'us' ? (e.name ?? 'Doelpunt') : d.theirName
+      const who = e.team === 'us' ? (e.name ?? 'Owngoal') : d.theirName
       ctx.fillText(who, PAD + 110, y)
 
       if (e.clock) {

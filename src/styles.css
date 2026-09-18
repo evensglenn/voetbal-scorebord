@@ -797,11 +797,6 @@ input:focus-visible {
   font-size: 1.1rem;
 }
 
-.squad-goals {
-  font-weight: 600;
-  color: var(--club);
-}
-
 .empty {
   margin: 0.4rem 1rem;
   font-size: 1rem;
@@ -931,12 +926,6 @@ input:focus-visible {
   color: var(--ink);
 }
 
-.squad-hat {
-  margin-left: 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--muted);
-}
 
 /* Bevestigingsvenster */
 .overlay {
