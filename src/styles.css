@@ -958,6 +958,33 @@ input:focus-visible {
   gap: 0.5rem;
 }
 
+.update-toast {
+  position: fixed;
+  z-index: 9;
+  left: 50%;
+  bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  width: min(calc(100% - 2rem), 26rem);
+  padding: 0.7rem 0.7rem 0.7rem 1rem;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(17, 22, 27, 0.35);
+  font-size: 0.95rem;
+  animation: dialog-in 180ms ease-out;
+}
+
+.update-toast .btn {
+  flex: 0 0 auto;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.8rem;
+}
+
 @keyframes overlay-in {
   from {
     opacity: 0;
@@ -973,7 +1000,8 @@ input:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .overlay,
-  .dialog {
+  .dialog,
+  .update-toast {
     animation: none;
   }
 }

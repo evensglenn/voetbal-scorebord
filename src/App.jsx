@@ -110,6 +110,7 @@ export default function App() {
   const [resetting, setResetting] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [compactBoard, setCompactBoard] = useState(false)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
   const [standalone] = useState(
     () =>
       window.matchMedia?.('(display-mode: standalone)').matches ||
@@ -147,6 +148,12 @@ export default function App() {
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
+    const onUpdate = () => setUpdateAvailable(true)
+    window.addEventListener('scorebord:update-available', onUpdate)
+    return () => window.removeEventListener('scorebord:update-available', onUpdate)
   }, [])
 
   const clock = match.clocks[match.period - 1]
@@ -502,6 +509,15 @@ export default function App() {
           onConfirm={resetClock}
           onCancel={() => setResetting(false)}
         />
+      )}
+
+      {updateAvailable && (
+        <div className="update-toast" role="status">
+          <span>Nieuwe versie beschikbaar</span>
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>
+            Vernieuwen
+          </button>
+        </div>
       )}
     </div>
   )
