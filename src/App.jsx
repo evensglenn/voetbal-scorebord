@@ -374,7 +374,7 @@ export default function App() {
   const [timeUp, setTimeUp] = useState(false)
   useEffect(() => {
     if (clock !== periodSeconds || periodSeconds <= 0) return
-    navigator.vibrate?.(200)
+    navigator.vibrate?.([160, 90, 160])
     setTimeUp(true)
     const t = setTimeout(() => setTimeUp(false), 1200)
     return () => clearTimeout(t)
