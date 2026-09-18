@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { drawSummary, loadClubLogo, W as SHOT_W, H as SHOT_H } from './summary.js'
+import { drawSummary, loadClubLogo, heightFor, W as SHOT_W } from './summary.js'
 import { version as APP_VERSION } from '../package.json'
 
 const STORAGE_KEY = 'matchblad.v1'
@@ -192,7 +192,18 @@ export default function App() {
     const events = match.events.map((e) => {
       if (e.team === 'us') us += 1
       else them += 1
-      return { team: e.team, period: e.period, us, them }
+      const player = match.players.find((p) => p.id === e.playerId)
+      const len = runs.streak[e.id]
+      const hatLabel = runs.hat[e.id] && len >= 3 ? (len === 3 ? 'hattrick' : `${len} op rij`) : null
+      return {
+        team: e.team,
+        period: e.period,
+        us,
+        them,
+        name: e.team === 'us' ? (player?.name ?? null) : null,
+        clock: e.clock,
+        hatLabel,
+      }
     })
 
     const scorers = groupScorers(
@@ -516,7 +527,7 @@ function Summary({ data, onClose }) {
       const logo = await loadClubLogo()
       const canvas = document.createElement('canvas')
       canvas.width = SHOT_W
-      canvas.height = SHOT_H
+      canvas.height = heightFor(data)
       drawSummary(canvas.getContext('2d'), data, logo)
       canvas.toBlob((blob) => {
         if (stale) return

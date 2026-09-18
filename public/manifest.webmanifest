@@ -1,7 +1,7 @@
 {
   "name": "Scorebord",
   "short_name": "Scorebord",
-  "description": "Score, doelpuntenmakers en tijdslijn van een U9-match.",
+  "description": "Score, doelpuntenmakers en tijdslijn van een voetbalmatch.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

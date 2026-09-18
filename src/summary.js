@@ -1,26 +1,27 @@
-// Tekent de samenvatting van de match als één afbeelding met een 4:5-verhouding,
-// het formaat dat in WhatsApp en op Instagram volledig getoond wordt.
-// Er wordt getekend op een vast "ontwerp"-raster van DESIGN_W × DESIGN_H, dat via
-// ctx.scale() uitvergroot wordt naar de werkelijke canvasgrootte (W × H) — zo blijft
-// de afbeelding scherp op een groter scherm zonder dat elk getal in dit bestand
-// herrekend moet worden.
+// Tekent de samenvatting van de match als één afbeelding met een vaste breedte.
+// De hoogte groeit mee met de inhoud (veel doelpunten -> een langere afbeelding),
+// dus niets moet krimpen om te passen. Er wordt getekend op een vast "ontwerp"-
+// raster van DESIGN_W breed, dat via ctx.scale() uitvergroot wordt naar de
+// werkelijke canvasgrootte (W) — zo blijft de afbeelding scherp op een groter
+// scherm zonder dat elk getal in dit bestand herrekend moet worden.
 const DESIGN_W = 1080
-const DESIGN_H = 1350
 const SCALE = 4 / 3
 
 export const W = Math.round(DESIGN_W * SCALE)
-export const H = Math.round(DESIGN_H * SCALE)
 
 const INK = '#11161b'
 const PAPER = '#ffffff'
 const CLUB = '#e4600a'
 const AWAY = '#98a2ab'
 const HAIR = 'rgba(255, 255, 255, 0.14)'
+const GRID = 'rgba(255, 255, 255, 0.22)'
 const FADED = 'rgba(255, 255, 255, 0.55)'
 
 const PAD = 70
 const font = (weight, size) =>
   `${weight} ${size}px "Barlow Semi Condensed", system-ui, sans-serif`
+
+const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath()
@@ -47,12 +48,51 @@ function badge(ctx, text, x, y, fill = CLUB, color = INK) {
   return w
 }
 
+const HEADER_H = 360
+const CHART_GAP = 64
+const CHART_FOOTPRINT = 380
+const SECTION_GAP = 76
+const SCORER_ROW_H = 66
+const TIMELINE_ROW_H = 58
+
+// Gedeelde plattegrond: bepaalt waar elk onderdeel begint en hoe hoog de hele
+// afbeelding moet worden. drawSummary() en heightFor() gebruiken exact dezelfde
+// berekening, zodat het canvas altijd precies past op wat er getekend wordt.
+function computeLayout(d) {
+  const chartTop = HEADER_H + CHART_GAP
+
+  const scorersTop = chartTop + CHART_FOOTPRINT + SECTION_GAP
+  const scorersContentH = d.scorers.length === 0 ? 66 : d.scorers.length * SCORER_ROW_H
+  const scorersEnd = scorersTop + 66 + scorersContentH
+
+  const periods = [1, 2, 3, 4].filter((p) => d.events.some((e) => e.period === p))
+  const timelineTop = scorersEnd + SECTION_GAP
+  let timelineContentH = 0
+  if (periods.length > 0) {
+    timelineContentH += 60
+    for (const p of periods) {
+      timelineContentH += 46 + d.events.filter((e) => e.period === p).length * TIMELINE_ROW_H + 18
+    }
+  }
+  const timelineEnd = timelineTop + timelineContentH
+
+  const totalHeight = timelineEnd + 200
+
+  return { chartTop, scorersTop, timelineTop, periods, totalHeight }
+}
+
+export function heightFor(d) {
+  return Math.round(computeLayout(d).totalHeight * SCALE)
+}
+
 export function drawSummary(ctx, d, logo) {
+  const layout = computeLayout(d)
+
   ctx.save()
   ctx.scale(SCALE, SCALE)
 
   ctx.fillStyle = INK
-  ctx.fillRect(0, 0, DESIGN_W, DESIGN_H)
+  ctx.fillRect(0, 0, DESIGN_W, layout.totalHeight)
   ctx.textBaseline = 'alphabetic'
 
   // Groot, grijs en gedempt clublogo op de achtergrond onderaan — zichtbaar als
@@ -62,7 +102,13 @@ export function drawSummary(ctx, d, logo) {
     ctx.save()
     ctx.filter = 'grayscale(1)'
     ctx.globalAlpha = 0.3
-    ctx.drawImage(logo, (DESIGN_W - logoSize) / 2, DESIGN_H - logoSize - 8, logoSize, logoSize)
+    ctx.drawImage(
+      logo,
+      (DESIGN_W - logoSize) / 2,
+      layout.totalHeight - logoSize - 8,
+      logoSize,
+      logoSize,
+    )
     ctx.restore()
   }
 
@@ -104,12 +150,13 @@ export function drawSummary(ctx, d, logo) {
   ctx.strokeStyle = HAIR
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.moveTo(PAD, 360)
-  ctx.lineTo(DESIGN_W - PAD, 360)
+  ctx.moveTo(PAD, HEADER_H)
+  ctx.lineTo(DESIGN_W - PAD, HEADER_H)
   ctx.stroke()
 
-  drawChart(ctx, d, 424)
-  drawScorers(ctx, d, 880)
+  drawChart(ctx, d, layout.chartTop)
+  drawScorers(ctx, d, layout.scorersTop)
+  drawTimeline(ctx, d, layout)
 
   ctx.restore()
 }
@@ -128,28 +175,38 @@ function drawChart(ctx, d, top) {
   const max = Math.max(d.left.goals, d.right.goals, 2)
   const yFor = (v) => y1 - (v / max) * (y1 - y0)
 
-  // Periodes
-  ctx.font = font(500, 26)
-  for (let p = 0; p < 4; p++) {
-    if (p > 0) {
-      ctx.strokeStyle = HAIR
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.moveTo(x0 + p * band, y0 - 10)
-      ctx.lineTo(x0 + p * band, y1)
-      ctx.stroke()
-    }
+  // Y-as: subtiele horizontale lijnen met het aantal doelpunten ernaast.
+  const step = Math.max(1, Math.ceil(max / 6))
+  ctx.font = font(500, 22)
+  for (let v = 0; v <= max; v += step) {
+    const y = yFor(v)
+    ctx.strokeStyle = HAIR
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(x0, y)
+    ctx.lineTo(x1, y)
+    ctx.stroke()
+
     ctx.fillStyle = FADED
-    ctx.textAlign = 'center'
-    ctx.fillText(`P${p + 1}`, x0 + (p + 0.5) * band, y1 + 44)
+    ctx.textAlign = 'right'
+    ctx.fillText(`${v}`, x0 - 16, y + 8)
   }
 
-  ctx.strokeStyle = HAIR
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(x0, y1)
-  ctx.lineTo(x1, y1)
-  ctx.stroke()
+  // Periodes
+  ctx.font = font(500, 26)
+  for (let p = 1; p < 4; p++) {
+    ctx.strokeStyle = GRID
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(x0 + p * band, y0 - 10)
+    ctx.lineTo(x0 + p * band, y1)
+    ctx.stroke()
+  }
+  for (let p = 0; p < 4; p++) {
+    ctx.fillStyle = FADED
+    ctx.textAlign = 'center'
+    ctx.fillText(`P${p + 1}`, x0 + (p + 0.5) * band, y1 + 52)
+  }
 
   // Elk doelpunt krijgt een plaats binnen zijn periode.
   const points = []
@@ -163,7 +220,7 @@ function drawChart(ctx, d, top) {
   const line = (team, color) => {
     ctx.strokeStyle = color
     ctx.lineWidth = 7
-    ctx.lineJoin = 'round'
+    ctx.lineJoin = 'miter'
     ctx.beginPath()
     ctx.moveTo(x0, yFor(0))
     let value = 0
@@ -176,27 +233,36 @@ function drawChart(ctx, d, top) {
     }
     ctx.lineTo(x1, yFor(value))
     ctx.stroke()
-
-    ctx.fillStyle = color
-    for (const pt of points) {
-      if (pt.team !== team) continue
-      ctx.beginPath()
-      ctx.arc(pt.x, yFor(team === 'us' ? pt.us : pt.them), 10, 0, Math.PI * 2)
-      ctx.fill()
-    }
   }
 
   line('them', AWAY)
   line('us', CLUB)
 
-  // Wie hoort bij welke lijn
+  // Wie hoort bij welke lijn — een klein streepje in de teamkleur voor de naam,
+  // zodat het meteen als grafieklegenda leest in plaats van gekleurde tekst.
+  const legendY = y1 + 104
+  const swatch = (color, x) => {
+    ctx.strokeStyle = color
+    ctx.lineWidth = 5
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(x, legendY - 9)
+    ctx.lineTo(x + 28, legendY - 9)
+    ctx.stroke()
+  }
+
   ctx.font = font(600, 28)
   ctx.textAlign = 'left'
+
+  swatch(CLUB, x0)
   ctx.fillStyle = CLUB
-  ctx.fillText(d.ourName, x0, y1 + 96)
+  ctx.fillText(d.ourName, x0 + 38, legendY)
   const w = ctx.measureText(d.ourName).width
+
+  const secondX = x0 + 38 + w + 32
+  swatch(AWAY, secondX)
   ctx.fillStyle = AWAY
-  ctx.fillText(d.theirName, x0 + w + 40, y1 + 96)
+  ctx.fillText(d.theirName, secondX + 38, legendY)
 }
 
 function drawScorers(ctx, d, top) {
@@ -212,21 +278,12 @@ function drawScorers(ctx, d, top) {
     return
   }
 
-  // Iedereen die scoorde krijgt een regel; bij veel scorers krimpt de rijhoogte
-  // zodat de lijst binnen het vaste canvasformaat blijft passen.
-  const rows = d.scorers
   const listTop = top + 66
-  const available = DESIGN_H - 40 - listTop
-  const rowH = Math.min(66, Math.max(30, available / rows.length))
-  const nameSize = rowH >= 58 ? 42 : rowH >= 48 ? 36 : rowH >= 40 ? 30 : 24
-  const dotR = rowH >= 58 ? 12 : rowH >= 48 ? 10 : rowH >= 40 ? 8 : 6
-  const dotGap = dotR * 2 + 10
-
-  rows.forEach((s, i) => {
-    const y = listTop + i * rowH
+  d.scorers.forEach((s, i) => {
+    const y = listTop + i * SCORER_ROW_H
 
     ctx.fillStyle = PAPER
-    ctx.font = font(i === 0 ? 700 : 500, nameSize)
+    ctx.font = font(i === 0 ? 700 : 500, 42)
     ctx.textAlign = 'left'
     ctx.fillText(s.name, PAD, y)
 
@@ -235,28 +292,74 @@ function drawScorers(ctx, d, top) {
       badge(ctx, s.hattricks === 1 ? 'hattrick' : `${s.hattricks} hattricks`, x, y - 4)
     }
 
-    // Eén bolletje per doelpunt, zodat je de verhouding in één blik ziet.
-    const dots = Math.min(s.goals, 8)
-    for (let k = 0; k < dots; k++) {
-      ctx.fillStyle = CLUB
-      ctx.beginPath()
-      ctx.arc(DESIGN_W - PAD - dotGap / 2 - k * dotGap, y - rowH * 0.2, dotR, 0, Math.PI * 2)
-      ctx.fill()
-    }
-    if (s.goals > 8) {
-      ctx.fillStyle = CLUB
-      ctx.font = font(600, Math.max(22, nameSize - 10))
-      ctx.textAlign = 'right'
-      ctx.fillText(`${s.goals}`, DESIGN_W - PAD - dotGap / 2 - 8 * dotGap, y - 2)
-    }
+    ctx.fillStyle = CLUB
+    ctx.font = font(700, 42)
+    ctx.textAlign = 'right'
+    ctx.fillText(`${s.goals}×`, DESIGN_W - PAD, y)
 
     ctx.strokeStyle = HAIR
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(PAD, y + rowH * 0.33)
-    ctx.lineTo(DESIGN_W - PAD, y + rowH * 0.33)
+    ctx.moveTo(PAD, y + 22)
+    ctx.lineTo(DESIGN_W - PAD, y + 22)
     ctx.stroke()
   })
+}
+
+function drawTimeline(ctx, d, layout) {
+  const { periods, timelineTop } = layout
+  if (periods.length === 0) return
+
+  let y = timelineTop
+  ctx.fillStyle = FADED
+  ctx.font = font(600, 30)
+  ctx.textAlign = 'left'
+  ctx.fillText('Tijdslijn', PAD, y)
+  y += 60
+
+  for (const p of periods) {
+    ctx.fillStyle = FADED
+    ctx.font = font(600, 26)
+    ctx.textAlign = 'left'
+    ctx.fillText(`Periode ${p}`, PAD, y)
+    y += 46
+
+    for (const e of d.events.filter((ev) => ev.period === p)) {
+      ctx.fillStyle = e.team === 'us' ? CLUB : AWAY
+      ctx.font = font(700, 34)
+      ctx.textAlign = 'left'
+      ctx.fillText(`${e.us}–${e.them}`, PAD, y)
+
+      ctx.fillStyle = PAPER
+      ctx.font = font(500, 34)
+      const who = e.team === 'us' ? (e.name ?? 'Doelpunt') : d.theirName
+      ctx.fillText(who, PAD + 110, y)
+
+      if (e.clock) {
+        const whoW = ctx.measureText(who).width
+        ctx.fillStyle = FADED
+        ctx.font = font(500, 28)
+        ctx.fillText(mmss(e.clock), PAD + 110 + whoW + 18, y)
+      }
+
+      if (e.hatLabel) {
+        ctx.fillStyle = CLUB
+        ctx.font = font(600, 26)
+        ctx.textAlign = 'right'
+        ctx.fillText(e.hatLabel, DESIGN_W - PAD, y)
+      }
+
+      ctx.strokeStyle = HAIR
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(PAD, y + 20)
+      ctx.lineTo(DESIGN_W - PAD, y + 20)
+      ctx.stroke()
+
+      y += TIMELINE_ROW_H
+    }
+    y += 18
+  }
 }
 
 // Laadt het clublogo één keer en hergebruikt daarna dezelfde Image, zodat
