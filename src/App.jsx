@@ -67,6 +67,7 @@ const emptyTeam = (ageGroup = 'U9') => {
     clocks: Array(cfg.periods).fill(0),
     started: false,
     activePlayerIds: [],
+    runningSince: null,
   }
 }
 
@@ -84,6 +85,7 @@ function normalizeTeam(team) {
     // Opslag van vóór dit veld had geen selectie: dan telt de hele ploeg mee.
     // Verwijderde spelers vallen automatisch weg uit de selectie.
     activePlayerIds: (team.activePlayerIds ?? playerIds).filter((id) => playerIds.includes(id)),
+    runningSince: team.runningSince ?? null,
   }
 }
 
@@ -303,7 +305,12 @@ export default function App() {
     })
   }
 
-  const [running, setRunning] = useState(false)
+  // De klok staat "aan" zolang runningSince gezet is — dat tijdstip wordt mee
+  // opgeslagen, zodat de effectief verstreken tijd (Date.now() - runningSince)
+  // ook correct blijft nadat de app op de achtergrond gooide of de tab even
+  // helemaal herladen werd, in plaats van te pauzeren omdat setInterval-ticks
+  // daar niet doorlopen.
+  const running = match.runningSince != null
   const [screen, setScreen] = useState('match')
   const [startingMatch, setStartingMatch] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -318,7 +325,6 @@ export default function App() {
       window.matchMedia?.('(display-mode: standalone)').matches ||
       window.navigator.standalone === true,
   )
-  const tick = useRef(null)
 
   useEffect(() => {
     try {
@@ -328,16 +334,22 @@ export default function App() {
     }
   }, [state])
 
+  // Drijft enkel her-renders aan zodat de klok (die zelf uit runningSince
+  // wordt herberekend) live meetelt. Bij terugkeer uit de achtergrond — waar
+  // setInterval geen doorgang vindt — haalt visibilitychange/focus de
+  // weergave meteen in, in plaats van tot de volgende seconde te wachten.
+  const [, forceTick] = useState(0)
   useEffect(() => {
     if (!running) return
-    tick.current = setInterval(() => {
-      setMatch((m) => {
-        const clocks = [...m.clocks]
-        clocks[m.period - 1] = clocks[m.period - 1] + 1
-        return { ...m, clocks }
-      })
-    }, 1000)
-    return () => clearInterval(tick.current)
+    const bump = () => forceTick((n) => n + 1)
+    const id = setInterval(bump, 1000)
+    document.addEventListener('visibilitychange', bump)
+    window.addEventListener('focus', bump)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', bump)
+      window.removeEventListener('focus', bump)
+    }
   }, [running])
 
   useEffect(() => {
@@ -365,15 +377,22 @@ export default function App() {
   }, [])
 
   const PERIODS = Array.from({ length: match.periodsCount }, (_, i) => i + 1)
-  const clock = match.clocks[match.period - 1]
+  const clock =
+    match.clocks[match.period - 1] +
+    (match.runningSince ? Math.floor((Date.now() - match.runningSince) / 1000) : 0)
   const periodSeconds = match.periodMinutes * 60
   const extraSeconds = Math.max(0, clock - periodSeconds)
   const canUndoPeriod =
     match.period > 1 && !match.events.some((event) => event.period === match.period)
 
   const [timeUp, setTimeUp] = useState(false)
+  const prevClock = useRef(clock)
   useEffect(() => {
-    if (clock !== periodSeconds || periodSeconds <= 0) return
+    const prev = prevClock.current
+    prevClock.current = clock
+    // ">=" i.p.v. "===": als de app een tijdje op de achtergrond stond, kan de
+    // klok in één keer over de periodegrens heen springen.
+    if (periodSeconds <= 0 || prev >= periodSeconds || clock < periodSeconds) return
     navigator.vibrate?.([160, 90, 160])
     setTimeUp(true)
     const t = setTimeout(() => setTimeUp(false), 1200)
@@ -426,20 +445,30 @@ export default function App() {
   const removeEvent = (id) =>
     setMatch((m) => ({ ...m, events: m.events.filter((e) => e.id !== id) }))
 
+  // Zet lopende tijd (runningSince) om in vast opgeslagen seconden op de
+  // huidige periode, zodat er niets verloren gaat bij het wisselen van
+  // periode of het stoppen van de klok.
+  const bakeElapsed = (m) => {
+    if (!m.runningSince) return m
+    const clocks = [...m.clocks]
+    clocks[m.period - 1] += Math.floor((Date.now() - m.runningSince) / 1000)
+    return { ...m, clocks, runningSince: null }
+  }
+
+  const toggleClock = () =>
+    setMatch((m) => (m.runningSince ? bakeElapsed(m) : { ...m, runningSince: Date.now() }))
+
   const advancePeriod = () => {
     if (match.period >= PERIODS.length) return
-    setRunning(false)
-    setMatch((m) => ({ ...m, period: m.period + 1 }))
+    setMatch((m) => ({ ...bakeElapsed(m), period: m.period + 1 }))
   }
 
   const undoPeriodChange = () => {
     if (match.period <= 1) return
-    setRunning(false)
-    setMatch((m) => ({ ...m, period: m.period - 1 }))
+    setMatch((m) => ({ ...bakeElapsed(m), period: m.period - 1 }))
   }
 
   const startMatch = ({ teamId, opponent, home, periodsCount, periodMinutes, activePlayerIds }) => {
-    setRunning(false)
     setState((s) => ({
       ...s,
       activeTeamId: teamId,
@@ -456,6 +485,7 @@ export default function App() {
               clocks: Array(periodsCount).fill(0),
               started: true,
               activePlayerIds,
+              runningSince: null,
             })
           : t,
       ),
@@ -465,7 +495,6 @@ export default function App() {
   }
 
   const endMatch = () => {
-    setRunning(false)
     const finished = { id: uid(), finishedAt: new Date().toISOString(), ...buildSummary(match) }
     setState((s) => ({
       ...s,
@@ -478,6 +507,7 @@ export default function App() {
               events: [],
               period: 1,
               clocks: Array(t.periodsCount).fill(0),
+              runningSince: null,
             })
           : t,
       ),
@@ -486,13 +516,13 @@ export default function App() {
   }
 
   const cancelMatch = () => {
-    setRunning(false)
     setMatch((m) => ({
       ...m,
       started: false,
       events: [],
       period: 1,
       clocks: Array(m.periodsCount).fill(0),
+      runningSince: null,
     }))
     setCanceling(false)
   }
@@ -501,11 +531,10 @@ export default function App() {
     setState((s) => ({ ...s, history: s.history.filter((h) => h.id !== id) }))
 
   const resetClock = () => {
-    setRunning(false)
     setMatch((m) => {
       const clocks = [...m.clocks]
       clocks[m.period - 1] = 0
-      return { ...m, clocks }
+      return { ...m, clocks, runningSince: null }
     })
     setResetting(false)
   }
@@ -563,7 +592,7 @@ export default function App() {
                 </div>
                 <button
                   className={running ? 'btn btn-clock is-running' : 'btn btn-clock'}
-                  onClick={() => setRunning((r) => !r)}
+                  onClick={toggleClock}
                   aria-label={running ? 'Pauze' : 'Start'}
                   title={running ? 'Pauze' : 'Start'}
                 >

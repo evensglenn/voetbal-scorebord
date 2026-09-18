@@ -4,7 +4,7 @@
 // het manifest) altijd door. Enkel de gehashte build-bestanden onder /assets/
 // (hun naam verandert zodra de inhoud verandert) mogen veilig eerst uit de cache.
 
-const CACHE = 'scorebord-v0.27.1'
+const CACHE = 'scorebord-v0.28.0'
 
 self.addEventListener('install', () => self.skipWaiting())
 
