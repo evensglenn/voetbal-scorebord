@@ -1,8 +1,10 @@
 // Houdt de app bruikbaar aan de zijlijn, ook als het netwerk daar niets waard is.
-// Pagina's: eerst het netwerk, met de cache als vangnet.
-// Bestanden (js, css, iconen, fonts): eerst de cache, want hun naam bevat een hash.
+// Pagina's en onveranderlijk-benoemde bestanden (manifest, iconen, favicon):
+// eerst het netwerk, met de cache als vangnet — zo komen naamswijzigingen (zoals
+// het manifest) altijd door. Enkel de gehashte build-bestanden onder /assets/
+// (hun naam verandert zodra de inhoud verandert) mogen veilig eerst uit de cache.
 
-const CACHE = 'matchblad-v1'
+const CACHE = 'scorebord-v1'
 
 self.addEventListener('install', () => self.skipWaiting())
 
@@ -25,7 +27,9 @@ self.addEventListener('fetch', (event) => {
   const request = event.request
   if (request.method !== 'GET') return
 
-  if (request.mode === 'navigate') {
+  const isHashedAsset = new URL(request.url).pathname.includes('/assets/')
+
+  if (!isHashedAsset) {
     event.respondWith(
       fetch(request)
         .then((response) => store(request, response))
