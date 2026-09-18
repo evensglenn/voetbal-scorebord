@@ -4,7 +4,7 @@
   --paper: #ffffff;
   --club: #e4600a;
   --away: #59646f;
-  --muted: #667079;
+  --muted: #586269;
   --line: rgba(17, 22, 27, 0.16);
   --line-soft: rgba(17, 22, 27, 0.08);
   --radius: 11px;
@@ -129,7 +129,7 @@ body {
 
 .board.is-compact .age-badge {
   margin-top: 0;
-  font-size: 0.62rem;
+  font-size: 0.72rem;
 }
 
 /* Tabs */
@@ -235,24 +235,18 @@ body {
   min-width: 4.5rem;
 }
 
-.clock-time {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-}
-
 .btn.btn-clock-reset {
   display: inline-flex;
-  flex: 0 0 2rem;
+  flex: 0 0 2.75rem;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  min-width: 2rem;
-  min-height: 2rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 50%;
+  border-radius: var(--radius);
   color: var(--muted);
 }
 
@@ -425,6 +419,33 @@ body {
   padding: 0.7rem 1rem 0;
 }
 
+.row.row-flush {
+  padding: 0;
+}
+
+.panel-card {
+  margin: 0.7rem 1rem 0;
+  padding: 0.85rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.panel-card + .panel-card {
+  margin-top: 0.6rem;
+}
+
+.panel-card > .choice-label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.panel-card > .field {
+  display: block;
+  width: 100%;
+}
+
 .field {
   flex: 1;
   min-width: 0;
@@ -447,7 +468,6 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.7rem 1rem 0;
 }
 
 .choice-label {
@@ -459,7 +479,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  margin: 0.6rem 1rem 0;
+  margin: 0.6rem 0 0;
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--muted);
@@ -538,6 +558,8 @@ input:focus-visible {
 }
 
 .scorer-name {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -628,10 +650,6 @@ input:focus-visible {
 }
 
 .btn-undo {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.35rem;
   background: transparent;
   border-color: rgba(228, 96, 10, 0.35);
   color: var(--ink);
@@ -724,8 +742,11 @@ input:focus-visible {
 
 /* Spelers */
 .squad {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
   list-style: none;
-  margin: 0.4rem 0 0;
+  margin: 0.7rem 0 0;
   padding: 0 1rem;
 }
 
@@ -733,8 +754,11 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--line);
+  padding: 0.65rem 0.75rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .squad-name {
@@ -781,7 +805,7 @@ input:focus-visible {
   }
 }
 
-@media (max-width: 22rem) {
+@media (max-width: 26rem) {
   .period-change,
   .last-action {
     align-items: stretch;
@@ -789,8 +813,7 @@ input:focus-visible {
   }
 
   .btn-undo {
-    justify-content: center;
-    width: 100%;
+    align-self: flex-end;
   }
 }
 
@@ -814,6 +837,15 @@ input:focus-visible {
 .banner-who {
   font-size: 1.05rem;
   font-weight: 500;
+}
+
+.banner-streak {
+  background: rgba(228, 96, 10, 0.12);
+  color: var(--ink);
+}
+
+.banner-streak .banner-what {
+  color: var(--club);
 }
 
 @keyframes banner-in {
@@ -847,16 +879,6 @@ input:focus-visible {
   font-size: 1rem;
   letter-spacing: 0.12em;
   color: var(--club);
-}
-
-.streak {
-  margin-left: auto;
-  padding: 0.05rem 0.35rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--muted);
 }
 
 .tl-row.is-hat {
@@ -964,7 +986,7 @@ input:focus-visible {
     align-items: start;
     column-gap: 0.75rem;
     max-width: none;
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
   }

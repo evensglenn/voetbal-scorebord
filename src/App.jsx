@@ -288,17 +288,7 @@ export default function App() {
               <div className="clock">
                 <div className="clock-readout">
                   <span className="clock-label">Periode {match.period}</span>
-                  <div className="clock-time">
-                    <span className="clock-num">{mmss(clock)}</span>
-                    <button
-                      className="btn btn-quiet btn-clock-reset"
-                      onClick={() => setResetting(true)}
-                      aria-label="Klok terug op nul"
-                      title="Klok terug op nul"
-                    >
-                      <ResetIcon />
-                    </button>
-                  </div>
+                  <span className="clock-num">{mmss(clock)}</span>
                 </div>
                 <button
                   className={running ? 'btn btn-clock is-running' : 'btn btn-clock'}
@@ -318,6 +308,16 @@ export default function App() {
                   >
                     <span>{match.period + 1}</span>
                     <span className="next-arrow" aria-hidden="true">→</span>
+                  </button>
+                )}
+                {clock > 0 && (
+                  <button
+                    className="btn btn-quiet btn-clock-reset"
+                    onClick={() => setResetting(true)}
+                    aria-label="Klok terug op nul"
+                    title="Klok terug op nul"
+                  >
+                    <ResetIcon />
                   </button>
                 )}
               </div>
@@ -348,7 +348,6 @@ export default function App() {
                       {'•'.repeat(Math.min(runs.hattricks[p.id], 3))}
                     </span>
                   )}
-                  {onARoll === 2 && <span className="streak">2 op rij</span>}
                   {goalsBy[p.id] > 0 && <span className="tally">{goalsBy[p.id]}</span>}
                 </button>
               )
@@ -374,9 +373,13 @@ export default function App() {
                   <span>Klok staat klaar op {mmss(clock)}</span>
                 </span>
               </div>
-              <button className="btn btn-undo" onClick={undoPeriodChange}>
+              <button
+                className="btn btn-icon btn-undo"
+                onClick={undoPeriodChange}
+                aria-label="Ongedaan maken"
+                title="Ongedaan maken"
+              >
                 <UndoIcon />
-                Ongedaan maken
               </button>
             </section>
           ) : (
@@ -621,11 +624,12 @@ function Confirm({ title, body, confirmLabel, onConfirm, onCancel }) {
 }
 
 function HattrickBanner({ live, players }) {
-  if (!live || live.len < 3) return null
+  if (!live || live.len < 2) return null
   const name = players.find((p) => p.id === live.playerId)?.name ?? 'Onbekende speler'
+  const isHattrick = live.len >= 3
 
   return (
-    <p className="banner" role="status">
+    <p className={isHattrick ? 'banner' : 'banner banner-streak'} role="status">
       <span className="banner-what">
         {live.len === 3 ? 'Hattrick' : `${live.len} op rij`}
       </span>
@@ -745,13 +749,17 @@ function LastAction({ match, score, opponentName, onUndo }) {
       <div className="last-action-copy">
         <span className="last-action-check" aria-hidden="true">✓</span>
         <span>
-          <strong>Doelpunt geregistreerd</strong>
+          <strong>Geregistreerd</strong>
           <span className="last-action-meta">{label} · {score.us}–{score.them}</span>
         </span>
       </div>
-      <button className="btn btn-undo" onClick={onUndo}>
+      <button
+        className="btn btn-icon btn-undo"
+        onClick={onUndo}
+        aria-label="Ongedaan maken"
+        title="Ongedaan maken"
+      >
         <UndoIcon />
-        Ongedaan maken
       </button>
     </section>
   )
@@ -770,27 +778,34 @@ function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
 
   return (
     <section className="pane-squad">
-      <h2 className="section-title">Spelers</h2>
-      <div className="row">
-        <input
-          className="field field-num"
-          value={number}
-          onChange={(e) => setNumber(e.target.value)}
-          placeholder="Nr"
-          inputMode="numeric"
-          aria-label="Rugnummer"
-        />
-        <input
-          className="field"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          placeholder="Naam"
-          aria-label="Naam speler"
-        />
-        <button className="btn btn-primary" onClick={submit}>
-          Toevoegen
-        </button>
+      <h2 className="section-title">Ploeg</h2>
+      <div className="panel-card">
+        <div className="row row-flush">
+          <input
+            className="field field-num"
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+            placeholder="Nr"
+            inputMode="numeric"
+            aria-label="Rugnummer"
+          />
+          <input
+            className="field"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            placeholder="Naam"
+            aria-label="Naam speler"
+          />
+          <button
+            className="btn btn-primary btn-icon"
+            onClick={submit}
+            aria-label="Speler toevoegen"
+            title="Speler toevoegen"
+          >
+            <PlusIcon />
+          </button>
+        </div>
       </div>
 
       {players.length === 0 ? (
@@ -810,11 +825,12 @@ function Squad({ players, goalsBy, hattricks, onAdd, onRemove }) {
                 )}
               </span>
               <button
-                className="btn btn-quiet"
+                className="btn btn-quiet btn-icon"
                 onClick={() => onRemove(p.id)}
                 aria-label={`${p.name} verwijderen`}
+                title={`${p.name} verwijderen`}
               >
-                Verwijderen
+                <TrashIcon />
               </button>
             </li>
           ))}
@@ -886,6 +902,35 @@ function UndoIcon() {
   )
 }
 
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        d="M10 4v12M4 10h12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+      <path
+        d="M4 6h12M8 6V4.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V6M5.5 6l.6 9.2a1.5 1.5 0 0 0 1.5 1.4h4.8a1.5 1.5 0 0 0 1.5-1.4l.6-9.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function LiveIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
@@ -928,10 +973,14 @@ function InfoIcon() {
 function Wedstrijd({ opponent, onOpponentChange, home, onVenueChange, ageGroup, onAgeGroupChange }) {
   return (
     <section className="pane-squad">
-      <h2 className="section-title">Wedstrijd</h2>
+      <h2 className="section-title">Instellingen</h2>
 
-      <div className="row">
+      <div className="panel-card">
+        <label className="choice-label" htmlFor="opponent-name">
+          Tegenstander
+        </label>
         <input
+          id="opponent-name"
           className="field"
           value={opponent}
           onChange={(e) => onOpponentChange(e.target.value)}
@@ -940,7 +989,7 @@ function Wedstrijd({ opponent, onOpponentChange, home, onVenueChange, ageGroup, 
         />
       </div>
 
-      <div className="choice-row">
+      <div className="panel-card choice-row">
         <span className="choice-label">{TEAM} speelt</span>
         <div className="periods">
           <button
@@ -960,40 +1009,37 @@ function Wedstrijd({ opponent, onOpponentChange, home, onVenueChange, ageGroup, 
         </div>
       </div>
 
-      <div className="choice-row">
-        <span className="choice-label">Leeftijdscategorie</span>
-        <div className="periods">
-          <button
-            className={ageGroup === 'U7' ? 'per is-on' : 'per'}
-            onClick={() => onAgeGroupChange('U7')}
-            aria-pressed={ageGroup === 'U7'}
-          >
-            U7 · 4×10&apos;
-          </button>
-          <button
-            className={ageGroup === 'U9' ? 'per is-on' : 'per'}
-            onClick={() => onAgeGroupChange('U9')}
-            aria-pressed={ageGroup === 'U9'}
-          >
-            U9 · 4×15&apos;
-          </button>
+      <div className="panel-card">
+        <div className="choice-row">
+          <span className="choice-label">Leeftijdscategorie</span>
+          <div className="periods">
+            <button
+              className={ageGroup === 'U7' ? 'per is-on' : 'per'}
+              onClick={() => onAgeGroupChange('U7')}
+              aria-pressed={ageGroup === 'U7'}
+            >
+              U7 · 4×10&apos;
+            </button>
+            <button
+              className={ageGroup === 'U9' ? 'per is-on' : 'per'}
+              onClick={() => onAgeGroupChange('U9')}
+              aria-pressed={ageGroup === 'U9'}
+            >
+              U9 · 4×15&apos;
+            </button>
+          </div>
         </div>
+
+        <a
+          className="rules-link"
+          href={RULES_URL[ageGroup]}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <InfoIcon />
+          Spelreglement {ageGroup} bekijken (pdf)
+        </a>
       </div>
-
-      <a
-        className="rules-link"
-        href={RULES_URL[ageGroup]}
-        target="_blank"
-        rel="noreferrer"
-      >
-        <InfoIcon />
-        Spelreglement {ageGroup} bekijken (pdf)
-      </a>
-
-      <p className="empty">
-        De naam van de tegenstander verschijnt op het scorebord en in de samenvatting. De
-        leeftijdscategorie bepaalt de duur van elke periode.
-      </p>
     </section>
   )
 }
