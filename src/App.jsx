@@ -386,7 +386,6 @@ export default function App() {
                   className={onARoll >= 3 ? 'scorer is-hat' : 'scorer'}
                   onClick={() => addGoal('us', p.id)}
                 >
-                  {p.number !== '' && <span className="shirt">{p.number}</span>}
                   <span className="scorer-name">{p.name}</span>
                   {runs.hattricks[p.id] > 0 && (
                     <span className="hats" title="Hattricks deze match">
@@ -809,13 +808,11 @@ function LastAction({ match, score, opponentName, onUndo }) {
 
 function Squad({ players, onAdd, onRemove }) {
   const [name, setName] = useState('')
-  const [number, setNumber] = useState('')
 
   const submit = () => {
     if (!name.trim()) return
-    onAdd({ name: name.trim(), number: number.trim() })
+    onAdd({ name: name.trim() })
     setName('')
-    setNumber('')
   }
 
   return (
@@ -823,14 +820,6 @@ function Squad({ players, onAdd, onRemove }) {
       <h2 className="section-title">Ploeg</h2>
       <div className="panel-card">
         <div className="row row-flush">
-          <input
-            className="field field-num"
-            value={number}
-            onChange={(e) => setNumber(e.target.value)}
-            placeholder="Nr"
-            inputMode="numeric"
-            aria-label="Rugnummer"
-          />
           <input
             className="field"
             value={name}
@@ -856,7 +845,6 @@ function Squad({ players, onAdd, onRemove }) {
         <ul className="squad">
           {players.map((p) => (
             <li key={p.id}>
-              {p.number !== '' && <span className="shirt">{p.number}</span>}
               <span className="squad-name">{p.name}</span>
               <button
                 className="btn btn-quiet btn-icon"

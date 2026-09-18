@@ -489,10 +489,6 @@ body {
   font-size: 1rem;
 }
 
-.field-num {
-  flex: 0 0 4rem;
-}
-
 .choice-row {
   display: flex;
   flex-wrap: wrap;
@@ -596,18 +592,6 @@ input:focus-visible {
   white-space: nowrap;
 }
 
-.shirt {
-  flex: 0 0 auto;
-  min-width: 1.6rem;
-  padding: 0.1rem 0.3rem;
-  background: var(--ground);
-  border-radius: var(--radius);
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-align: center;
-  color: var(--muted);
-}
-
 .tally {
   margin-left: auto;
   font-size: 1.25rem;
@@ -690,8 +674,7 @@ input:focus-visible {
   padding-top: 1rem;
 }
 
-.scorer:active .tally,
-.scorer:active .shirt {
+.scorer:active .tally {
   color: inherit;
 }
 
