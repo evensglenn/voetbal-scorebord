@@ -235,6 +235,27 @@ body {
   min-width: 4.5rem;
 }
 
+.clock-extra {
+  margin-left: 0.35rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.clock-num.is-timeup {
+  animation: clock-signal 400ms ease-in-out 2;
+}
+
+@keyframes clock-signal {
+  0%,
+  100% {
+    color: inherit;
+  }
+  50% {
+    color: var(--club);
+  }
+}
+
 .btn.btn-clock-reset {
   display: inline-flex;
   flex: 0 0 2.75rem;
@@ -331,6 +352,11 @@ body {
   .clock-num {
     min-width: 3.6rem;
     font-size: 1.8rem;
+  }
+
+  .clock-extra {
+    margin-left: 0.2rem;
+    font-size: 0.95rem;
   }
 
   .btn-clock {
@@ -856,7 +882,8 @@ input:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .banner {
+  .banner,
+  .clock-num.is-timeup {
     animation: none;
   }
 
@@ -1053,6 +1080,10 @@ input:focus-visible {
 
   .clock-num {
     font-size: 1.65rem;
+  }
+
+  .clock-extra {
+    font-size: 0.9rem;
   }
 
   .section-title {

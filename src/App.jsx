@@ -80,6 +80,28 @@ function analyseRuns(events) {
   return { streak, hat, hattricks, live: last }
 }
 
+const formatNames = (names) => {
+  if (names.length === 1) return names[0]
+  if (names.length === 2) return `${names[0]} & ${names[1]}`
+  return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`
+}
+
+// Spelers met evenveel doelpunten (en evenveel hattricks) samen op één regel,
+// bv. "Seppe & Rune". De lijst moet al gesorteerd zijn op goals/hattricks zodat
+// gelijke reeksen naast elkaar staan.
+function groupScorers(scorers) {
+  const groups = []
+  for (const s of scorers) {
+    const last = groups[groups.length - 1]
+    if (last && last.goals === s.goals && last.hattricks === s.hattricks) {
+      last.names.push(s.name)
+    } else {
+      groups.push({ names: [s.name], goals: s.goals, hattricks: s.hattricks })
+    }
+  }
+  return groups.map((g) => ({ name: formatNames(g.names), goals: g.goals, hattricks: g.hattricks }))
+}
+
 export default function App() {
   const [match, setMatch] = useState(load)
   const [running, setRunning] = useState(false)
@@ -108,7 +130,7 @@ export default function App() {
     tick.current = setInterval(() => {
       setMatch((m) => {
         const clocks = [...m.clocks]
-        clocks[m.period - 1] = Math.min(periodSecondsFor(m.ageGroup), clocks[m.period - 1] + 1)
+        clocks[m.period - 1] = clocks[m.period - 1] + 1
         return { ...m, clocks }
       })
     }, 1000)
@@ -129,10 +151,17 @@ export default function App() {
 
   const clock = match.clocks[match.period - 1]
   const periodSeconds = periodSecondsFor(match.ageGroup)
+  const extraSeconds = Math.max(0, clock - periodSeconds)
   const canUndoPeriod =
     match.period > 1 && !match.events.some((event) => event.period === match.period)
+
+  const [timeUp, setTimeUp] = useState(false)
   useEffect(() => {
-    if (clock >= periodSeconds) setRunning(false)
+    if (clock !== periodSeconds || periodSeconds <= 0) return
+    navigator.vibrate?.(200)
+    setTimeUp(true)
+    const t = setTimeout(() => setTimeUp(false), 1200)
+    return () => clearTimeout(t)
   }, [clock, periodSeconds])
 
   const opponentName = match.opponent?.trim() || OPPONENT
@@ -166,14 +195,16 @@ export default function App() {
       return { team: e.team, period: e.period, us, them }
     })
 
-    const scorers = match.players
-      .map((p) => ({
-        name: p.name,
-        goals: goalsBy[p.id] ?? 0,
-        hattricks: runs.hattricks[p.id] ?? 0,
-      }))
-      .filter((s) => s.goals > 0)
-      .sort((a, b) => b.goals - a.goals || b.hattricks - a.hattricks || a.name.localeCompare(b.name))
+    const scorers = groupScorers(
+      match.players
+        .map((p) => ({
+          name: p.name,
+          goals: goalsBy[p.id] ?? 0,
+          hattricks: runs.hattricks[p.id] ?? 0,
+        }))
+        .filter((s) => s.goals > 0)
+        .sort((a, b) => b.goals - a.goals || b.hattricks - a.hattricks || a.name.localeCompare(b.name)),
+    )
 
     const unnamed = match.events.filter((e) => e.team === 'us' && !e.playerId).length
     if (unnamed > 0) scorers.push({ name: 'Zonder naam', goals: unnamed, hattricks: 0 })
@@ -288,7 +319,10 @@ export default function App() {
               <div className="clock">
                 <div className="clock-readout">
                   <span className="clock-label">Periode {match.period}</span>
-                  <span className="clock-num">{mmss(clock)}</span>
+                  <span className={timeUp ? 'clock-num is-timeup' : 'clock-num'}>
+                    {mmss(Math.min(clock, periodSeconds))}
+                    {extraSeconds > 0 && <span className="clock-extra">+{mmss(extraSeconds)}</span>}
+                  </span>
                 </div>
                 <button
                   className={running ? 'btn btn-clock is-running' : 'btn btn-clock'}
