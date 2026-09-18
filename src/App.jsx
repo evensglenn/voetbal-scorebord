@@ -218,7 +218,7 @@ export default function App() {
     )
 
     const unnamed = match.events.filter((e) => e.team === 'us' && !e.playerId).length
-    if (unnamed > 0) scorers.push({ name: 'Owngoal', goals: unnamed, hattricks: 0 })
+    if (unnamed > 0) scorers.push({ name: 'Own goal', goals: unnamed, hattricks: 0 })
 
     return {
       date: new Date().toLocaleDateString('nl-BE', {
@@ -398,7 +398,7 @@ export default function App() {
               )
             })}
             <button className="scorer scorer-neutral" onClick={() => addGoal('us', null)}>
-              Owngoal
+              Own goal
             </button>
           </div>
 
@@ -755,7 +755,7 @@ function Timeline({ match, runs, opponentName, onRemove }) {
                       {r.us}–{r.them}
                     </span>
                     <span className="tl-who">
-                      {r.team === 'us' ? (r.name ?? 'Owngoal') : opponentName}
+                      {r.team === 'us' ? (r.name ?? 'Own goal') : opponentName}
                       {r.clock ? <span className="tl-min"> {mmss(r.clock)}</span> : null}
                     </span>
                     {inHat && len >= 3 && (
@@ -784,7 +784,7 @@ function LastAction({ match, score, opponentName, onUndo }) {
   if (!last) return null
 
   const player = match.players.find((candidate) => candidate.id === last.playerId)
-  const label = last.team === 'them' ? opponentName : player?.name ? player.name : 'Owngoal'
+  const label = last.team === 'them' ? opponentName : player?.name ? player.name : 'Own goal'
 
   return (
     <section className="last-action" aria-live="polite">

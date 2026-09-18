@@ -334,7 +334,7 @@ function drawTimeline(ctx, d, layout) {
 
       ctx.fillStyle = PAPER
       ctx.font = font(500, 34)
-      const who = e.team === 'us' ? (e.name ?? 'Owngoal') : d.theirName
+      const who = e.team === 'us' ? (e.name ?? 'Own goal') : d.theirName
       ctx.fillText(who, PAD + 110, y)
 
       if (e.clock) {
