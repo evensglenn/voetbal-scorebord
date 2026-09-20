@@ -63,6 +63,7 @@ const emptyTeam = (ageGroup = 'U9') => {
     opponent: '',
     players: [],
     events: [],
+    penalties: [],
     period: 1,
     clocks: Array(cfg.periods).fill(0),
     started: false,
@@ -86,6 +87,7 @@ function normalizeTeam(team) {
     // Verwijderde spelers vallen automatisch weg uit de selectie.
     activePlayerIds: (team.activePlayerIds ?? playerIds).filter((id) => playerIds.includes(id)),
     runningSince: team.runningSince ?? null,
+    penalties: team.penalties ?? [],
   }
 }
 
@@ -247,6 +249,29 @@ function buildSummary(match) {
   const unnamed = match.events.filter((e) => e.team === 'us' && !e.playerId).length
   if (unnamed > 0) scorers.push({ name: 'Own goal', goals: unnamed, hattricks: 0 })
 
+  const penalties = match.penalties ?? []
+  const penaltiesSummary =
+    penalties.length === 0
+      ? null
+      : {
+          us: {
+            scored: penalties.filter((p) => p.team === 'us' && p.scored).length,
+            total: penalties.filter((p) => p.team === 'us').length,
+          },
+          them: {
+            scored: penalties.filter((p) => p.team === 'them' && p.scored).length,
+            total: penalties.filter((p) => p.team === 'them').length,
+          },
+          attempts: penalties.map((p) => ({
+            team: p.team,
+            name:
+              p.team === 'us'
+                ? (match.players.find((pl) => pl.id === p.playerId)?.name ?? 'Onbekende speler')
+                : opponentName,
+            scored: p.scored,
+          })),
+        }
+
   return {
     date: new Date().toLocaleDateString('nl-BE', {
       day: 'numeric',
@@ -261,6 +286,7 @@ function buildSummary(match) {
     right,
     events,
     scorers,
+    penalties: penaltiesSummary,
   }
 }
 
@@ -445,6 +471,15 @@ export default function App() {
   const removeEvent = (id) =>
     setMatch((m) => ({ ...m, events: m.events.filter((e) => e.id !== id) }))
 
+  const addPenalty = (team, playerId, scored) =>
+    setMatch((m) => ({
+      ...m,
+      penalties: [...m.penalties, { id: uid(), team, playerId, scored }],
+    }))
+
+  const removePenalty = (id) =>
+    setMatch((m) => ({ ...m, penalties: m.penalties.filter((p) => p.id !== id) }))
+
   // Zet lopende tijd (runningSince) om in vast opgeslagen seconden op de
   // huidige periode, zodat er niets verloren gaat bij het wisselen van
   // periode of het stoppen van de klok.
@@ -481,6 +516,7 @@ export default function App() {
               periodsCount,
               periodMinutes,
               events: [],
+              penalties: [],
               period: 1,
               clocks: Array(periodsCount).fill(0),
               started: true,
@@ -505,6 +541,7 @@ export default function App() {
               ...t,
               started: false,
               events: [],
+              penalties: [],
               period: 1,
               clocks: Array(t.periodsCount).fill(0),
               runningSince: null,
@@ -520,6 +557,7 @@ export default function App() {
       ...m,
       started: false,
       events: [],
+      penalties: [],
       period: 1,
       clocks: Array(m.periodsCount).fill(0),
       runningSince: null,
@@ -708,6 +746,14 @@ export default function App() {
               Annuleer
             </button>
           </div>
+
+          <Penalties
+            penalties={match.penalties}
+            players={squadPlayers}
+            opponentName={opponentName}
+            onAdd={addPenalty}
+            onRemove={removePenalty}
+          />
 
           </div>
 
@@ -1153,6 +1199,97 @@ function LastAction({ match, score, opponentName, onUndo }) {
       >
         <UndoIcon />
       </button>
+    </section>
+  )
+}
+
+// Optioneel: penalty's die spelers (van beide ploegen, in eender welke
+// volgorde — soms alle spelers van 1 ploeg na elkaar) na afloop nog nemen.
+// Los van de reguliere doelpunten/tijdslijn, want telt niet mee voor de stand.
+function Penalties({ penalties, players, opponentName, onAdd, onRemove }) {
+  const [open, setOpen] = useState(false)
+  const expanded = open || penalties.length > 0
+
+  if (!expanded) {
+    return (
+      <button className="btn btn-quiet btn-penalties-toggle" onClick={() => setOpen(true)}>
+        Voeg penalty's toe
+      </button>
+    )
+  }
+
+  const usScored = penalties.filter((p) => p.team === 'us' && p.scored).length
+  const usTotal = penalties.filter((p) => p.team === 'us').length
+  const themScored = penalties.filter((p) => p.team === 'them' && p.scored).length
+  const themTotal = penalties.filter((p) => p.team === 'them').length
+
+  const takers = [...players.map((p) => ({ id: p.id, name: p.name })), { id: null, name: opponentName }]
+
+  return (
+    <section className="panel-card penalties">
+      <div className="choice-row">
+        <span className="choice-label">Penalty's</span>
+        {penalties.length > 0 && (
+          <span className="penalties-tally">
+            {usScored}/{usTotal} – {themScored}/{themTotal}
+          </span>
+        )}
+      </div>
+
+      <ul className="penalty-takers">
+        {takers.map((t) => {
+          const team = t.id === null ? 'them' : 'us'
+          return (
+            <li key={t.id ?? 'them'}>
+              <span className="penalty-taker-name">{t.name}</span>
+              <div className="penalty-taker-actions">
+                <button
+                  className="btn-penalty btn-penalty-yes"
+                  onClick={() => onAdd(team, t.id, true)}
+                  aria-label={`${t.name} scoorde penalty`}
+                >
+                  ✓
+                </button>
+                <button
+                  className="btn-penalty btn-penalty-no"
+                  onClick={() => onAdd(team, t.id, false)}
+                  aria-label={`${t.name} miste penalty`}
+                >
+                  ✗
+                </button>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+
+      {penalties.length > 0 && (
+        <ol className="penalty-list">
+          {penalties.map((p, i) => {
+            const name =
+              p.team === 'us' ? (players.find((pl) => pl.id === p.playerId)?.name ?? 'Onbekende speler') : opponentName
+            return (
+              <li key={p.id}>
+                <span className="penalty-list-index">{i + 1}.</span>
+                <span className={p.team === 'us' ? 'penalty-list-name is-ours' : 'penalty-list-name'}>
+                  {name}
+                </span>
+                <span className={p.scored ? 'penalty-list-result is-scored' : 'penalty-list-result'}>
+                  {p.scored ? '✓' : '✗'}
+                </span>
+                <button
+                  className="btn btn-quiet btn-icon"
+                  onClick={() => onRemove(p.id)}
+                  aria-label="Verwijder deze penalty"
+                  title="Verwijder deze penalty"
+                >
+                  <TrashIcon />
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+      )}
     </section>
   )
 }

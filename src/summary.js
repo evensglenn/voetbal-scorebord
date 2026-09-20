@@ -13,6 +13,8 @@ const INK = '#11161b'
 const PAPER = '#ffffff'
 const CLUB = '#e4600a'
 const AWAY = '#98a2ab'
+const GREEN = '#3ddc84'
+const RED = '#ff6b6b'
 const HAIR = 'rgba(255, 255, 255, 0.14)'
 const GRID = 'rgba(255, 255, 255, 0.22)'
 const FADED = 'rgba(255, 255, 255, 0.55)'
@@ -77,9 +79,13 @@ function computeLayout(d) {
   }
   const timelineEnd = timelineTop + timelineContentH
 
-  const totalHeight = timelineEnd + 200
+  const penaltiesTop = timelineEnd + SECTION_GAP
+  const penaltiesContentH = d.penalties ? 60 + d.penalties.attempts.length * TIMELINE_ROW_H : 0
+  const penaltiesEnd = d.penalties ? penaltiesTop + penaltiesContentH : timelineEnd
 
-  return { chartTop, scorersTop, timelineTop, periods, totalHeight }
+  const totalHeight = penaltiesEnd + 200
+
+  return { chartTop, scorersTop, timelineTop, penaltiesTop, periods, totalHeight }
 }
 
 export function heightFor(d) {
@@ -160,6 +166,7 @@ export function drawSummary(ctx, d, logo) {
   drawChart(ctx, d, layout.chartTop)
   drawScorers(ctx, d, layout.scorersTop)
   drawTimeline(ctx, d, layout)
+  drawPenalties(ctx, d, layout.penaltiesTop)
 
   ctx.restore()
 }
@@ -364,6 +371,48 @@ function drawTimeline(ctx, d, layout) {
     }
     y += 18
   }
+}
+
+function drawPenalties(ctx, d, top) {
+  if (!d.penalties) return
+
+  let y = top
+  ctx.fillStyle = FADED
+  ctx.font = font(600, 30)
+  ctx.textAlign = 'left'
+  ctx.fillText("Penalty's", PAD, y)
+
+  const { us, them } = d.penalties
+  ctx.font = font(700, 32)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = PAPER
+  ctx.fillText(`${us.scored}/${us.total} – ${them.scored}/${them.total}`, DESIGN_W - PAD, y)
+  y += 60
+
+  d.penalties.attempts.forEach((a, i) => {
+    ctx.fillStyle = a.team === 'us' ? CLUB : AWAY
+    ctx.font = font(700, 34)
+    ctx.textAlign = 'left'
+    ctx.fillText(`${i + 1}.`, PAD, y)
+
+    ctx.fillStyle = PAPER
+    ctx.font = font(500, 34)
+    ctx.fillText(a.name, PAD + 50, y)
+
+    ctx.fillStyle = a.scored ? GREEN : RED
+    ctx.font = font(700, 34)
+    ctx.textAlign = 'right'
+    ctx.fillText(a.scored ? '✓' : '✗', DESIGN_W - PAD, y)
+
+    ctx.strokeStyle = HAIR
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(PAD, y + 20)
+    ctx.lineTo(DESIGN_W - PAD, y + 20)
+    ctx.stroke()
+
+    y += TIMELINE_ROW_H
+  })
 }
 
 // Laadt het clublogo één keer en hergebruikt daarna dezelfde Image, zodat

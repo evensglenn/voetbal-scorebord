@@ -5,6 +5,7 @@
   --club: #e4600a;
   --away: #59646f;
   --danger: #d1332c;
+  --success: #1a7a3c;
   --muted: #586269;
   --line: rgba(17, 22, 27, 0.16);
   --line-soft: rgba(17, 22, 27, 0.08);
@@ -602,6 +603,109 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.btn-penalties-toggle {
+  margin: 0.7rem 1rem 0;
+}
+
+.penalties {
+  margin-top: 0.7rem;
+}
+
+.penalties-tally {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.penalty-takers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+}
+
+.penalty-takers li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.penalty-taker-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 1rem;
+}
+
+.penalty-taker-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.btn-penalty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  min-height: 2.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-penalty-yes {
+  color: var(--success);
+}
+
+.btn-penalty-no {
+  color: var(--danger);
+}
+
+.penalty-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+}
+
+.penalty-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.penalty-list-index {
+  color: var(--muted);
+  font-size: 0.85rem;
+  width: 1.3rem;
+}
+
+.penalty-list-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.penalty-list-name.is-ours {
+  color: var(--club);
+  font-weight: 500;
+}
+
+.penalty-list-result {
+  font-weight: 700;
+  color: var(--danger);
+}
+
+.penalty-list-result.is-scored {
+  color: var(--success);
 }
 
 .btn-remove-team {
