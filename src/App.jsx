@@ -56,6 +56,32 @@ const FORMAT_RULES_URL = {
 const SUB_COUNTDOWN = 30
 const SUB_NOTICE = 20
 
+// Spreekt een korte melding uit via de spraak van het toestel (Nederlandse
+// stem als die er is). Loopt enkel zolang de app op het scherm staat.
+function say(text) {
+  const synth = window.speechSynthesis
+  if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'nl-BE'
+  const voices = synth.getVoices()
+  const voice =
+    voices.find((v) => v.lang?.toLowerCase().replace('_', '-') === 'nl-be') ??
+    voices.find((v) => v.lang?.toLowerCase().startsWith('nl'))
+  if (voice) utterance.voice = voice
+  synth.cancel()
+  synth.speak(utterance)
+}
+
+// iOS laat spraak pas toe nadat ze één keer vanuit een tik gestart werd;
+// daarom bij het starten van de klok een stille, lege uitspraak.
+function unlockSpeech() {
+  const synth = window.speechSynthesis
+  if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return
+  const utterance = new SpeechSynthesisUtterance(' ')
+  utterance.volume = 0
+  synth.speak(utterance)
+}
+
 const uid = () => Math.random().toString(36).slice(2, 10)
 
 const emptyTeam = (ageGroup = 'U9') => {
@@ -386,6 +412,33 @@ export default function App() {
     }
   }, [running])
 
+  // Zolang de klok loopt, houden we het scherm wakker: een webapp kan bij een
+  // vergrendeld scherm niet meer trillen of spreken. Het systeem geeft die
+  // vergrendeling vrij zodra de app naar de achtergrond gaat, dus bij
+  // terugkeer vragen we ze opnieuw aan.
+  useEffect(() => {
+    if (!running || !navigator.wakeLock) return
+    let lock = null
+    let cancelled = false
+    const acquire = async () => {
+      if (document.visibilityState !== 'visible' || (lock && !lock.released)) return
+      try {
+        const next = await navigator.wakeLock.request('screen')
+        if (cancelled) next.release()
+        else lock = next
+      } catch {
+        // geweigerd (bv. batterijbesparing); de klok werkt gewoon verder
+      }
+    }
+    acquire()
+    document.addEventListener('visibilitychange', acquire)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', acquire)
+      lock?.release().catch(() => {})
+    }
+  }, [running])
+
   useEffect(() => {
     // De sticky kop zelf krimpt zo'n 70px wanneer hij compact wordt (minder
     // padding, kleinere cijfers). Die krimp verschuift de pagina-inhoud, wat
@@ -428,6 +481,7 @@ export default function App() {
     // klok in één keer over de periodegrens heen springen.
     if (periodSeconds <= 0 || prev >= periodSeconds || clock < periodSeconds) return
     navigator.vibrate?.([160, 90, 160])
+    say(match.period >= match.periodsCount ? 'Einde wedstrijd' : `Einde periode ${match.period}`)
     setTimeUp(true)
     const t = setTimeout(() => setTimeUp(false), 1200)
     return () => clearTimeout(t)
@@ -462,7 +516,19 @@ export default function App() {
     prevSubIndex.current = subIndex
     if (subIndex <= prev || subPhase !== 'now' || subDismissed) return
     navigator.vibrate?.([300, 120, 300, 120, 300])
+    say('Tijd voor wissel')
   }, [subIndex, subPhase, subDismissed])
+
+  // Aankondiging bij het begin van de aftelling — niet als je er pas middenin
+  // belandt (na terugspoelen of terugkeren uit de achtergrond).
+  const prevSubPhase = useRef(subPhase)
+  useEffect(() => {
+    const prev = prevSubPhase.current
+    prevSubPhase.current = subPhase
+    if (prev === 'soon' || subPhase !== 'soon' || subDismissed) return
+    if (nextSub - clock < SUB_COUNTDOWN - 3) return
+    say(`Wissel over ${SUB_COUNTDOWN} seconden`)
+  }, [subPhase, subDismissed, nextSub, clock])
 
   const opponentName = match.opponent?.trim() || OPPONENT
 
@@ -529,8 +595,10 @@ export default function App() {
     return { ...m, clocks, runningSince: null }
   }
 
-  const toggleClock = () =>
+  const toggleClock = () => {
+    if (!running) unlockSpeech()
     setMatch((m) => (m.runningSince ? bakeElapsed(m) : { ...m, runningSince: Date.now() }))
+  }
 
   const advancePeriod = () => {
     if (match.period >= PERIODS.length) return
@@ -1312,7 +1380,10 @@ function Penalties({ penalties, players, opponentName, onAdd, onRemove }) {
         <span className="choice-label">Penalty's</span>
         {penalties.length > 0 && (
           <span className="penalties-tally">
-            {usScored}/{usTotal} – {themScored}/{themTotal}
+            <span className="penalties-tally-us">
+              {usScored}/{usTotal}
+            </span>{' '}
+            – {themScored}/{themTotal}
           </span>
         )}
       </div>

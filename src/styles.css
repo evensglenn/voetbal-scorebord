@@ -683,6 +683,10 @@ body {
   color: var(--muted);
 }
 
+.penalties-tally-us {
+  color: var(--club);
+}
+
 .penalty-takers {
   display: flex;
   flex-direction: column;
