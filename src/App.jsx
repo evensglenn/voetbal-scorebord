@@ -852,7 +852,6 @@ export default function App() {
 
           <div className="opponent-action">
             <button className="btn btn-away btn-opponent" onClick={() => addGoal('them')}>
-              <span aria-hidden="true">+</span>
               Tegendoelpunt
             </button>
           </div>
@@ -884,18 +883,6 @@ export default function App() {
             />
           )}
 
-          <div className="row row-secondary">
-            <button className="btn" onClick={() => setSharing(true)}>
-              Samenvatting
-            </button>
-            <button className="btn btn-quiet" onClick={() => setEnding(true)}>
-              Beëindig
-            </button>
-            <button className="btn btn-quiet" onClick={() => setCanceling(true)}>
-              Annuleer
-            </button>
-          </div>
-
           <Penalties
             penalties={match.penalties}
             players={squadPlayers}
@@ -903,6 +890,18 @@ export default function App() {
             onAdd={addPenalty}
             onRemove={removePenalty}
           />
+
+          <div className="match-actions">
+            <button className="btn" onClick={() => setSharing(true)}>
+              Samenvatting
+            </button>
+            <button className="btn btn-end" onClick={() => setEnding(true)}>
+              Beëindig match
+            </button>
+            <button className="btn-cancel-match" onClick={() => setCanceling(true)}>
+              Annuleer wedstrijd
+            </button>
+          </div>
 
           </div>
 
@@ -1361,7 +1360,8 @@ function Penalties({ penalties, players, opponentName, onAdd, onRemove }) {
 
   if (!expanded) {
     return (
-      <button className="btn btn-quiet btn-penalties-toggle" onClick={() => setOpen(true)}>
+      <button className="btn btn-penalties-toggle" onClick={() => setOpen(true)}>
+        <span aria-hidden="true">+</span>
         Voeg penalty's toe
       </button>
     )

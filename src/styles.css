@@ -670,8 +670,23 @@ body {
   gap: 0.5rem;
 }
 
-.btn-penalties-toggle {
-  margin: 0.7rem 1rem 0;
+.btn.btn-penalties-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: calc(100% - 2rem);
+  margin: 1rem 1rem 0;
+  background: transparent;
+  border-style: dashed;
+  border-color: rgba(17, 22, 27, 0.3);
+  color: var(--muted);
+}
+
+.btn-penalties-toggle span {
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .penalties {
@@ -897,11 +912,6 @@ input:focus-visible {
   font-weight: 600;
 }
 
-.btn-opponent span {
-  font-size: 1.35rem;
-  line-height: 1;
-}
-
 .last-action {
   display: flex;
   align-items: center;
@@ -954,8 +964,31 @@ input:focus-visible {
   color: var(--ink);
 }
 
-.row-secondary {
-  padding-top: 1rem;
+/* Afsluitende acties onderaan de match */
+.match-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 1rem 1rem 0;
+}
+
+.btn.btn-end {
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+.btn-cancel-match {
+  grid-column: 1 / -1;
+  justify-self: center;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .scorer:active .tally {

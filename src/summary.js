@@ -386,12 +386,18 @@ function drawPenalties(ctx, d, top) {
   ctx.font = font(700, 32)
   ctx.textAlign = 'right'
   // Rechts uitgelijnd en stuk voor stuk getekend, zodat onze score in de
-  // clubkleur kan staan.
-  const themText = ` – ${them.scored}/${them.total}`
+  // clubkleur en het streepje in het grijs kan staan.
+  const themText = `${them.scored}/${them.total}`
+  const dashText = ' – '
+  let x = DESIGN_W - PAD
   ctx.fillStyle = PAPER
-  ctx.fillText(themText, DESIGN_W - PAD, y)
+  ctx.fillText(themText, x, y)
+  x -= ctx.measureText(themText).width
+  ctx.fillStyle = FADED
+  ctx.fillText(dashText, x, y)
+  x -= ctx.measureText(dashText).width
   ctx.fillStyle = CLUB
-  ctx.fillText(`${us.scored}/${us.total}`, DESIGN_W - PAD - ctx.measureText(themText).width, y)
+  ctx.fillText(`${us.scored}/${us.total}`, x, y)
   y += 60
 
   d.penalties.attempts.forEach((a, i) => {
