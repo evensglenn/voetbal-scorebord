@@ -151,6 +151,7 @@ function normalizeTeam(team) {
     penalties: team.penalties ?? [],
     subMinutes: team.subMinutes ?? null,
     extraPeriods: team.extraPeriods ?? 0,
+    endedEarly: team.endedEarly ?? false,
   }
 }
 
@@ -586,7 +587,10 @@ export default function App() {
   }, [goalWhilePaused, running])
 
   const clockLabel = running ? 'Pauze' : clock > 0 ? 'Ga verder' : 'Start'
-  const periodOver = periodSeconds > 0 && clock >= periodSeconds
+  // Voorbij als de tijd om is, of als de laatste periode vroegtijdig gestopt werd.
+  const periodOver =
+    (periodSeconds > 0 && clock >= periodSeconds) ||
+    (match.endedEarly && match.period >= match.periodsCount)
   const lastPeriod = match.period >= match.periodsCount
   // Strafschoppen, samenvatting en beëindigen horen pas bij het einde van de
   // match: na de laatste periode, of zodra er al strafschoppen genomen zijn.
@@ -683,8 +687,15 @@ export default function App() {
       unlockSpeech()
       askNotificationPermission()
     }
-    setMatch((m) => (m.runningSince ? bakeElapsed(m) : { ...m, runningSince: Date.now() }))
+    // Opnieuw starten maakt een vroegtijdige stop ongedaan.
+    setMatch((m) =>
+      m.runningSince ? bakeElapsed(m) : { ...m, runningSince: Date.now(), endedEarly: false },
+    )
   }
+
+  // Laatste periode vroegtijdig stoppen: klok stil, en dezelfde keuze als na
+  // afloop (strafschoppen, extra periode of beëindigen).
+  const endEarly = () => setMatch((m) => ({ ...bakeElapsed(m), endedEarly: true }))
 
   const advancePeriod = () => {
     if (match.period >= PERIODS.length) return
@@ -713,6 +724,7 @@ export default function App() {
   const addExtraPeriod = () => {
     setMatch((m) => ({
       ...bakeElapsed(m),
+      endedEarly: false,
       periodsCount: m.periodsCount + 1,
       extraPeriods: m.extraPeriods + 1,
       period: m.periodsCount + 1,
@@ -741,6 +753,7 @@ export default function App() {
               periodMinutes,
               subMinutes,
               extraPeriods: 0,
+              endedEarly: false,
               events: [],
               penalties: [],
               period: 1,
@@ -773,6 +786,7 @@ export default function App() {
               period: 1,
               periodsCount: t.periodsCount - t.extraPeriods,
               extraPeriods: 0,
+              endedEarly: false,
               clocks: [],
               runningSince: null,
             })
@@ -794,6 +808,7 @@ export default function App() {
       period: 1,
       periodsCount: m.periodsCount - m.extraPeriods,
       extraPeriods: 0,
+      endedEarly: false,
       clocks: [],
       runningSince: null,
     }))
@@ -808,7 +823,7 @@ export default function App() {
     setMatch((m) => {
       const clocks = [...m.clocks]
       clocks[m.period - 1] = 0
-      return { ...m, clocks, runningSince: null }
+      return { ...m, clocks, runningSince: null, endedEarly: false }
     })
     setResetting(false)
   }
@@ -901,6 +916,18 @@ export default function App() {
                     >
                       <span>{match.period + 1}</span>
                       <span className="next-arrow" aria-hidden="true">→</span>
+                    </button>
+                  )}
+                  {/* In de laatste periode is er geen volgende periode meer: die
+                      plek dient dan om de wedstrijd vroegtijdig te beëindigen. */}
+                  {lastPeriod && !periodOver && (
+                    <button
+                      className="btn btn-next-period btn-end-early"
+                      onClick={endEarly}
+                      aria-label="Beëindig de wedstrijd vroegtijdig"
+                      title="Beëindig de wedstrijd vroegtijdig"
+                    >
+                      <FlagIcon />
                     </button>
                   )}
                   {clock > 0 && (
