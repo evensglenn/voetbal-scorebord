@@ -1658,7 +1658,9 @@ function Penalties({ onEnd, open, penalties, players, opponentName, onAdd, onRem
               onClick={() => setTaking({ ...t, team })}
             >
               <span className="scorer-name">{t.name}</span>
-              {taken.length > 0 && (
+              {/* Bij de tegenstander zouden de bolletjes zich opstapelen; de
+                  reeks eronder toont die al. */}
+              {team === 'us' && taken.length > 0 && (
                 <span className="penalty-dots" aria-label={`${taken.filter((p) => p.scored).length} van ${taken.length} raak`}>
                   {taken.map((p) => (
                     <span key={p.id} className={p.scored ? 'penalty-dot is-scored' : 'penalty-dot'} />
