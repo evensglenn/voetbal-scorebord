@@ -1194,7 +1194,6 @@ export default function App() {
 
       <div className="foot-spacer" aria-hidden="true" />
       <footer className="foot">
-        <img className="foot-logo" src={CLUB_LOGO} alt="" />
         <p>v{APP_VERSION}</p>
       </footer>
 

@@ -1367,15 +1367,6 @@ input:focus-visible {
   margin: 0;
 }
 
-.foot-logo {
-  display: block;
-  width: 5.5rem;
-  height: 5.5rem;
-  object-fit: contain;
-  margin: 0 auto 0.5rem;
-  filter: grayscale(1);
-  opacity: 0.3;
-}
 
 @media (min-width: 30rem) {
   .grid {
@@ -1587,7 +1578,10 @@ input:focus-visible {
   flex-direction: column;
   align-items: center;
   /* Loopt door tot bovenaan het scherm: titel en startkaart vormen één vlak. */
-  padding: calc(1.35rem + env(safe-area-inset-top, 0px)) 1.25rem 1.6rem;
+  padding: calc(1.35rem + env(safe-area-inset-top, 0px)) 1.25rem 2rem;
+  /* Vult het scherm tot net boven de versie en de tabbalk, zodat de inhoud
+     kan ademen. */
+  min-height: calc(100svh - 9.5rem - env(safe-area-inset-bottom, 0px));
   background:
     radial-gradient(90% 70% at 50% 100%, rgba(228, 96, 10, 0.26), transparent 70%),
     var(--ink);
@@ -1602,13 +1596,11 @@ input:focus-visible {
   z-index: 1;
 }
 
-.home-hero .board-title {
-  margin-bottom: 1.2rem;
-}
-
+/* De vrije ruimte gaat gelijk verdeeld boven het logo en boven de knop. */
 .home-hero-logo {
-  width: 4.5rem;
-  height: 4.5rem;
+  margin-top: auto;
+  width: 6rem;
+  height: 6rem;
   object-fit: contain;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
 }
@@ -1617,8 +1609,8 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  margin-top: 0.9rem;
-  font-size: 0.85rem;
+  margin-top: 1.4rem;
+  font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.7);
 }
 
@@ -1631,14 +1623,14 @@ input:focus-visible {
 }
 
 .home-hero-title {
-  margin: 0.55rem 0 0;
-  font-size: 1.75rem;
+  margin: 1rem 0 0;
+  font-size: 1.9rem;
   font-weight: 700;
   line-height: 1.1;
 }
 
 .home-hero-sub {
-  margin: 0.3rem 0 0;
+  margin: 0.5rem 0 0;
   font-size: 0.95rem;
   color: rgba(255, 255, 255, 0.7);
 }
@@ -1651,7 +1643,7 @@ input:focus-visible {
   width: 100%;
   max-width: 20rem;
   min-height: 3.5rem;
-  margin-top: 1.3rem;
+  margin-top: auto;
   padding: 1rem 2rem;
   background: var(--club);
   border-color: var(--club);
