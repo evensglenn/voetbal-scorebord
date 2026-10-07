@@ -175,36 +175,42 @@ function loadTheme() {
   }
 }
 
+// Zet opgeslagen gegevens (uit localStorage of een back-up) om naar een
+// geldige app-staat; null als er niets bruikbaars in zit.
+function fromStored(parsed) {
+  if (!parsed || typeof parsed !== 'object') return null
+  const history = Array.isArray(parsed.history) ? parsed.history : []
+  if (Array.isArray(parsed.teams) && parsed.teams.length > 0) {
+    const teams = parsed.teams.map((t) =>
+      normalizeTeam({
+        ...emptyTeam(t.ageGroup),
+        ...t,
+        started: t.started ?? hadActivity(t),
+        activePlayerIds: t.activePlayerIds ?? (t.players ?? []).map((p) => p.id),
+      }),
+    )
+    const activeTeamId = teams.some((t) => t.id === parsed.activeTeamId)
+      ? parsed.activeTeamId
+      : teams[0].id
+    return { teams, activeTeamId, history }
+  }
+  // Oud, plat matchformaat (vóór meerdere ploegen): wrap als eerste ploeg
+  // zodat bestaande matchgegevens niet verloren gaan.
+  if (!Array.isArray(parsed.players) && !Array.isArray(parsed.events)) return null
+  const legacy = normalizeTeam({
+    ...emptyTeam(parsed.ageGroup ?? 'U9'),
+    ...parsed,
+    started: parsed.started ?? hadActivity(parsed),
+    activePlayerIds: parsed.activePlayerIds ?? (parsed.players ?? []).map((p) => p.id),
+  })
+  return { teams: [legacy], activeTeamId: legacy.id, history }
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      const history = Array.isArray(parsed.history) ? parsed.history : []
-      if (Array.isArray(parsed.teams) && parsed.teams.length > 0) {
-        const teams = parsed.teams.map((t) =>
-          normalizeTeam({
-            ...emptyTeam(t.ageGroup),
-            ...t,
-            started: t.started ?? hadActivity(t),
-            activePlayerIds: t.activePlayerIds ?? (t.players ?? []).map((p) => p.id),
-          }),
-        )
-        const activeTeamId = teams.some((t) => t.id === parsed.activeTeamId)
-          ? parsed.activeTeamId
-          : teams[0].id
-        return { teams, activeTeamId, history }
-      }
-      // Oud, plat matchformaat (vóór meerdere ploegen): wrap als eerste ploeg
-      // zodat bestaande matchgegevens niet verloren gaan.
-      const legacy = normalizeTeam({
-        ...emptyTeam(parsed.ageGroup ?? 'U9'),
-        ...parsed,
-        started: parsed.started ?? hadActivity(parsed),
-        activePlayerIds: parsed.activePlayerIds ?? (parsed.players ?? []).map((p) => p.id),
-      })
-      return { teams: [legacy], activeTeamId: legacy.id, history }
-    }
+    const restored = raw && fromStored(JSON.parse(raw))
+    if (restored) return restored
   } catch {
     // onleesbare opslag: begin met een lege ploeg
   }
@@ -422,6 +428,16 @@ export default function App() {
   // daar niet doorlopen.
   const running = match.runningSince != null
   const [screen, setScreen] = useState('match')
+  // Instellingen is geen tab: onthoud waar je vandaan kwam om terug te keren.
+  const settingsBack = useRef('match')
+  const toggleSettings = () => {
+    if (screen === 'settings') {
+      setScreen(settingsBack.current)
+    } else {
+      settingsBack.current = screen
+      setScreen('settings')
+    }
+  }
   const [startingMatch, setStartingMatch] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [ending, setEnding] = useState(false)
@@ -431,6 +447,22 @@ export default function App() {
   const [compactBoard, setCompactBoard] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [theme, setTheme] = useState(loadTheme)
+  const [autoBackup, setAutoBackup] = useState(() => {
+    try {
+      return localStorage.getItem(AUTO_BACKUP_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    try {
+      if (autoBackup) localStorage.setItem(AUTO_BACKUP_KEY, '1')
+      else localStorage.removeItem(AUTO_BACKUP_KEY)
+    } catch {
+      // opslag geweigerd; de keuze geldt dan enkel voor deze sessie
+    }
+  }, [autoBackup])
   const [standalone] = useState(
     () =>
       window.matchMedia?.('(display-mode: standalone)').matches ||
@@ -811,7 +843,7 @@ export default function App() {
       finishedAt: new Date().toISOString(),
       ...buildSummary(match),
     }
-    setState((s) => ({
+    const finish = (s) => ({
       ...s,
       history: [finished, ...s.history],
       teams: s.teams.map((t) =>
@@ -830,7 +862,10 @@ export default function App() {
             })
           : t,
       ),
-    }))
+    })
+    setState(finish)
+    // Nog binnen de tik op "Ja, beëindig", zodat het deelvenster mag openen.
+    if (autoBackup) saveBackup(finish(state)).catch(() => {})
     setPenaltiesOpen(false)
     setEnding(false)
     // Meteen de samenvatting tonen om te delen; later terug te vinden in de Historiek.
@@ -1189,6 +1224,7 @@ export default function App() {
                 Annuleer wedstrijd
               </button>
             </div>
+
           </div>
         </>
         ) : (
@@ -1196,8 +1232,7 @@ export default function App() {
             team={match}
             onStart={() => setStartingMatch(true)}
             onOpenSquad={() => setScreen('squad')}
-            theme={theme}
-            onTheme={setTheme}
+            onSettings={toggleSettings}
           />
         )
       ) : screen === 'squad' ? (
@@ -1234,18 +1269,25 @@ export default function App() {
           onView={setViewingHistory}
           onDelete={deleteHistoryEntry}
         />
+      ) : screen === 'settings' ? (
+        <Settings
+          theme={theme}
+          onTheme={setTheme}
+          state={state}
+          restoreBlocked={state.teams.some((t) => t.started)}
+          onRestore={setState}
+          autoBackup={autoBackup}
+          onAutoBackup={setAutoBackup}
+          onBack={toggleSettings}
+        />
       ) : (
         <Stats teams={state.teams} history={state.history} defaultTeamId={state.activeTeamId} />
       )}
 
-      {/* Op het startscherm zit dit in de hero; elders onderaan de pagina. */}
-      {!(screen === 'match' && !match.started) && (
-        <>
-          <div className="foot-spacer" aria-hidden="true" />
-          <footer className="foot">
-            <ThemePill theme={theme} onTheme={setTheme} />
-          </footer>
-        </>
+      {/* Overal onderaan dezelfde ingang naar Instellingen; op het startscherm
+          zit hij in de hero. */}
+      {screen !== 'settings' && !(screen === 'match' && !match.started) && (
+        <SettingsLink onClick={toggleSettings} />
       )}
 
 
@@ -2120,9 +2162,236 @@ function Squad({
   )
 }
 
+// Ingang naar Instellingen, onderaan elk scherm.
+function SettingsLink({ onClick }) {
+  return (
+    <button className="settings-link" onClick={onClick}>
+      <GearIcon />
+      Instellingen
+    </button>
+  )
+}
+
+function Settings({
+  theme,
+  onTheme,
+  state,
+  restoreBlocked,
+  onRestore,
+  autoBackup,
+  onAutoBackup,
+  onBack,
+}) {
+  return (
+    <section className="pane-settings">
+      <div className="settings-head">
+        <button className="settings-back" onClick={onBack}>
+          ← Terug
+        </button>
+        <h2 className="settings-title">Instellingen</h2>
+      </div>
+
+      <h2 className="section-title">Weergave</h2>
+      <div className="panel-card">
+        <div className="theme-seg" role="group" aria-label="Thema">
+          {THEME_OPTIONS.map(({ value, short, Icon }) => (
+            <button
+              key={value}
+              className={value === theme ? 'per is-on' : 'per'}
+              onClick={() => onTheme(value)}
+              aria-pressed={value === theme}
+            >
+              <Icon />
+              {short}
+            </button>
+          ))}
+        </div>
+        <p className="backup-note">
+          {theme === 'auto'
+            ? 'Volgt de instelling van je toestel.'
+            : theme === 'dark'
+              ? 'Altijd donker, ook als je toestel licht staat.'
+              : 'Altijd licht, ook als je toestel donker staat.'}
+        </p>
+      </div>
+
+      <h2 className="section-title">Back-up</h2>
+      <Backup
+        state={state}
+        restoreBlocked={restoreBlocked}
+        onRestore={onRestore}
+        autoBackup={autoBackup}
+        onAutoBackup={onAutoBackup}
+      />
+
+      <h2 className="section-title">Over</h2>
+      <div className="panel-card settings-about">
+        <span>{TEAM} Scorebord</span>
+        <span className="settings-version">v{APP_VERSION}</span>
+      </div>
+    </section>
+  )
+}
+
+// Back-up: alles staat enkel in deze browser, dus een bestand bewaren
+// beschermt tegen gewiste browsergegevens of een nieuw toestel.
+const BACKUP_KEY = 'scorebord-last-backup'
+const AUTO_BACKUP_KEY = 'scorebord-auto-backup'
+const longDate = (d) =>
+  new Date(d).toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' })
+
+// Bewaart de gegevens als bestand: op een gsm via het deelvenster (bewaren in
+// Bestanden, Drive, WhatsApp…), op een computer gewoon downloaden. Geeft
+// false als het deelvenster weggeklikt werd; gooit een fout als het mislukt.
+async function saveBackup(state) {
+  const now = new Date().toISOString()
+  const json = JSON.stringify(
+    { app: 'scorebord', version: APP_VERSION, exportedAt: now, data: state },
+    null,
+    2,
+  )
+  // Lokale datum (JJJJ-MM-DD) in de naam, niet die van UTC.
+  const name = `scorebord-backup-${new Date().toLocaleDateString('sv-SE')}.json`
+  const file = new File([json], name, { type: 'application/json' })
+  const touch = window.matchMedia?.('(pointer: coarse)').matches
+  if (touch && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'Scorebord back-up' })
+    } catch (e) {
+      if (e?.name === 'AbortError') return false
+      throw e
+    }
+  } else {
+    const url = URL.createObjectURL(file)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = name
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+  try {
+    localStorage.setItem(BACKUP_KEY, now)
+  } catch {
+    // niet erg: enkel de datum van de laatste back-up gaat verloren
+  }
+  return true
+}
+
+function Backup({ state, restoreBlocked, onRestore, autoBackup, onAutoBackup }) {
+  const fileInput = useRef(null)
+  const [lastBackup, setLastBackup] = useState(() => {
+    try {
+      return localStorage.getItem(BACKUP_KEY)
+    } catch {
+      return null
+    }
+  })
+  const [pending, setPending] = useState(null)
+  const [message, setMessage] = useState(null)
+
+  const exportBackup = async () => {
+    try {
+      if (!(await saveBackup(state))) return
+    } catch {
+      setMessage({ error: true, text: 'De back-up kon niet gemaakt worden.' })
+      return
+    }
+    setLastBackup(localStorage.getItem(BACKUP_KEY))
+    setMessage(null)
+  }
+
+  const readFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      const parsed = JSON.parse(await file.text())
+      const data = fromStored(parsed?.app === 'scorebord' ? parsed.data : parsed)
+      if (!data) throw new Error('leeg')
+      setPending({ data, exportedAt: parsed.exportedAt })
+      setMessage(null)
+    } catch {
+      setMessage({ error: true, text: 'Dit bestand is geen geldige back-up van het scorebord.' })
+    }
+  }
+
+  const count = (n, one, many) => `${n} ${n === 1 ? one : many}`
+
+  return (
+    <>
+      <div className="panel-card backup">
+        <p className="backup-text">
+          Alles staat enkel op dit toestel. Bewaar af en toe een back-up, zodat je
+          spelers en uitslagen niet verloren gaan.
+        </p>
+        <p className="backup-last">
+          {lastBackup ? `Laatste back-up: ${longDate(lastBackup)}` : 'Nog geen back-up gemaakt.'}
+        </p>
+        <div className="row row-flush">
+          <button className="btn btn-primary btn-wide" onClick={exportBackup}>
+            Exporteer
+          </button>
+          <button
+            className="btn btn-wide"
+            onClick={() => fileInput.current?.click()}
+            disabled={restoreBlocked}
+            title={restoreBlocked ? 'Beëindig eerst de lopende wedstrijd' : undefined}
+          >
+            Zet terug
+          </button>
+        </div>
+        {restoreBlocked && (
+          <p className="backup-note">Terugzetten kan pas na de lopende wedstrijd.</p>
+        )}
+        <button
+          className="switch-row"
+          role="switch"
+          aria-checked={autoBackup}
+          onClick={() => onAutoBackup(!autoBackup)}
+        >
+          <span className="switch-text">
+            <span>Na elke wedstrijd</span>
+            <span className="switch-sub">
+              Maak automatisch een back-up wanneer je een wedstrijd beëindigt.
+            </span>
+          </span>
+          <span className={autoBackup ? 'switch is-on' : 'switch'} aria-hidden="true" />
+        </button>
+        {message && (
+          <p className={message.error ? 'backup-note is-error' : 'backup-note'} role="status">
+            {message.text}
+          </p>
+        )}
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          onChange={readFile}
+        />
+      </div>
+
+      {pending && (
+        <Confirm
+          title="Back-up terugzetten?"
+          body={`De back-up${pending.exportedAt ? ` van ${longDate(pending.exportedAt)}` : ''} bevat ${count(pending.data.teams.length, 'ploeg', 'ploegen')} en ${count(pending.data.history.length, 'wedstrijd', 'wedstrijden')}. Alles wat nu in de app staat, wordt vervangen.`}
+          confirmLabel="Ja, zet terug"
+          danger
+          onConfirm={() => {
+            onRestore(pending.data)
+            setPending(null)
+            setMessage({ text: 'De back-up is teruggezet.' })
+          }}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </>
+  )
+}
+
 // Startscherm zolang er geen wedstrijd bezig is: titel, ploeg en een
 // duidelijke aftrapknop in één vlak.
-function Home({ team, onStart, onOpenSquad, theme, onTheme }) {
+function Home({ team, onStart, onOpenSquad, onSettings }) {
   const cfg = AGE_CONFIG[team.ageGroup] ?? AGE_CONFIG.U9
 
   return (
@@ -2161,69 +2430,8 @@ function Home({ team, onStart, onOpenSquad, theme, onTheme }) {
             Voeg eerst spelers toe →
           </button>
         )}
-        <div className="home-hero-foot">
-          <ThemePill theme={theme} onTheme={onTheme} />
-        </div>
+        <SettingsLink onClick={onSettings} />
       </section>
-    </div>
-  )
-}
-
-// Thema en versie in één klein pilletje. Dicht toont het enkel het icoon
-// van het huidige thema; aantikken klapt de keuzes en het versienummer open.
-function ThemePill({ theme, onTheme }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  const current = THEME_OPTIONS.find((o) => o.value === theme) ?? THEME_OPTIONS[1]
-
-  useEffect(() => {
-    if (!open) return
-    const onPointer = (e) => {
-      if (!ref.current?.contains(e.target)) setOpen(false)
-    }
-    const onKey = (e) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointer)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('pointerdown', onPointer)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
-
-  // Alles blijft in de DOM: dicht krimpen de andere keuzes en de versie naar
-  // breedte 0, zodat het open- en dichtklappen vloeiend kan animeren.
-  return (
-    <div className={open ? 'theme-pill is-open' : 'theme-pill'} ref={ref}>
-      <div className="theme-toggle" role="group" aria-label="Thema">
-        {THEME_OPTIONS.map(({ value, label, Icon }) => {
-          const isOn = value === theme
-          const hidden = !open && !isOn
-          return (
-            <button
-              key={value}
-              className={isOn ? 'theme-opt is-on' : 'theme-opt'}
-              onClick={() => {
-                if (!open) return setOpen(true)
-                onTheme(value)
-                setOpen(false)
-              }}
-              aria-label={open ? label : `${current.label}. Thema kiezen`}
-              aria-pressed={open ? isOn : undefined}
-              aria-expanded={open ? undefined : 'false'}
-              aria-hidden={hidden || undefined}
-              tabIndex={hidden ? -1 : undefined}
-              title={label}
-            >
-              <Icon />
-            </button>
-          )
-        })}
-      </div>
-      <span className="theme-pill-version" aria-hidden={!open || undefined}>
-        v{APP_VERSION}
-      </span>
     </div>
   )
 }
@@ -2814,10 +3022,26 @@ function MoonIcon() {
 }
 
 const THEME_OPTIONS = [
-  { value: 'light', label: 'Licht thema', Icon: SunIcon },
-  { value: 'auto', label: 'Thema van het toestel volgen', Icon: AutoThemeIcon },
-  { value: 'dark', label: 'Donker thema', Icon: MoonIcon },
+  { value: 'light', short: 'Licht', Icon: SunIcon },
+  { value: 'auto', short: 'Automatisch', Icon: AutoThemeIcon },
+  { value: 'dark', short: 'Donker', Icon: MoonIcon },
 ]
+
+function GearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <path
+        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
 
 function LiveIcon() {
   return (
