@@ -1,7 +1,14 @@
+/* Licht thema is de basis. "ink" en "paper" wisselen om in het donkere
+   thema; "bar" blijft altijd het donkere vlak van scorebord en startscherm,
+   met "on-bar" als tekstkleur erop. "on-accent" is tekst op een gekleurd
+   vlak (club, rood, groen, grijs). */
 :root {
   --ink: #11161b;
   --ground: #e8eae6;
   --paper: #ffffff;
+  --bar: #11161b;
+  --on-bar: #ffffff;
+  --on-accent: #ffffff;
   --club: #e4600a;
   --away: #59646f;
   --danger: #d1332c;
@@ -9,11 +16,46 @@
   --muted: #586269;
   --line: rgba(17, 22, 27, 0.16);
   --line-soft: rgba(17, 22, 27, 0.08);
+  --tabbar: rgba(255, 255, 255, 0.96);
   --radius: 11px;
   --shadow: 0 2px 8px rgba(17, 22, 27, 0.07);
+  color-scheme: light;
   font-family: 'Barlow Semi Condensed', system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
+}
+
+/* Donker thema: volgt het toestel, tenzij er bewust voor licht gekozen is. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ink: #e6e9ec;
+    --ground: #0c1013;
+    --paper: #1a2027;
+    --away: #6d7883;
+    --danger: #e2483f;
+    --success: #2a9a52;
+    --muted: #9aa4ad;
+    --line: rgba(255, 255, 255, 0.15);
+    --line-soft: rgba(255, 255, 255, 0.07);
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    --tabbar: rgba(22, 28, 34, 0.94);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --ink: #e6e9ec;
+  --ground: #0c1013;
+  --paper: #1a2027;
+  --away: #6d7883;
+  --danger: #e2483f;
+  --success: #2a9a52;
+  --muted: #9aa4ad;
+  --line: rgba(255, 255, 255, 0.15);
+  --line-soft: rgba(255, 255, 255, 0.07);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --tabbar: rgba(22, 28, 34, 0.94);
+  color-scheme: dark;
 }
 
 * {
@@ -41,6 +83,18 @@ body {
   min-height: 100svh;
 }
 
+/* Duwt het thema/versie-pilletje naar onderaan, net boven de tabbalk, ook
+   als de pagina verder leeg is; bij lange inhoud krimpt hij naar 0. */
+.foot-spacer {
+  flex: 1 0 auto;
+}
+
+.foot {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 1rem 0;
+}
+
 /* Startscherm: de hero loopt door tot onder de tabbalk. */
 .shell.is-home {
   padding-bottom: 0;
@@ -54,8 +108,8 @@ body {
   overflow: hidden;
   background:
     radial-gradient(70% 140% at 50% 100%, rgba(228, 96, 10, 0.22), transparent 70%),
-    var(--ink);
-  color: var(--paper);
+    var(--bar);
+  color: var(--on-bar);
   padding: calc(1rem + env(safe-area-inset-top, 0px)) 1rem 0.85rem;
   box-shadow: 0 2px 12px rgba(17, 22, 27, 0.2);
   transition: padding 180ms ease, box-shadow 180ms ease;
@@ -118,7 +172,7 @@ body {
   font-size: 1.7rem;
   font-weight: 700;
   letter-spacing: 0.01em;
-  color: var(--paper);
+  color: var(--on-bar);
   transition: font-size 180ms ease;
 }
 
@@ -224,7 +278,7 @@ body {
   grid-template-columns: repeat(4, 1fr);
   width: min(100%, 34rem);
   padding: 0.35rem 0.65rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--tabbar);
   border-top: 1px solid var(--line);
   box-shadow: 0 -5px 20px rgba(17, 22, 27, 0.1);
   backdrop-filter: blur(12px);
@@ -507,7 +561,7 @@ body {
 }
 
 .sub-alert.is-now .sub-dismiss {
-  border-color: rgba(17, 22, 27, 0.35);
+  border-color: color-mix(in srgb, var(--ink) 35%, transparent);
 }
 
 @keyframes sub-pulse {
@@ -659,7 +713,7 @@ body {
 .btn-danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .btn-quiet {
@@ -694,7 +748,7 @@ body {
 .btn-clock.is-running {
   background: var(--club);
   border-color: var(--club);
-  color: var(--ink);
+  color: var(--bar);
 }
 
 .row {
@@ -922,7 +976,7 @@ body {
   border-radius: 50%;
   font-size: 0.6rem;
   font-weight: 700;
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .penalties-end {
@@ -999,7 +1053,7 @@ body {
   border-radius: 50%;
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .penalty-result.is-scored {
@@ -1098,7 +1152,7 @@ input:focus-visible {
 .scorer:active {
   background: var(--club);
   border-color: var(--club);
-  color: var(--paper);
+  color: var(--on-accent);
   transform: scale(0.98);
 }
 
@@ -1109,14 +1163,14 @@ input:focus-visible {
 .scorer-neutral:active {
   background: var(--away);
   border-color: var(--away);
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .scorer-opponent {
   background: var(--away);
   border-color: var(--away);
   border-left-color: var(--ink);
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .scorer-opponent:active {
@@ -1306,7 +1360,8 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.65rem 0.75rem;
+  /* Even hoog als een rij bij Uitslagen. */
+  padding: 0.45rem 0.75rem 0.45rem 0.85rem;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1568,8 +1623,8 @@ input:focus-visible {
   gap: 0.5rem 0.75rem;
   width: min(calc(100% - 2rem), 26rem);
   padding: 0.7rem 0.7rem 0.7rem 1rem;
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--bar);
+  color: var(--on-bar);
   border-radius: var(--radius);
   box-shadow: 0 8px 24px rgba(17, 22, 27, 0.35);
   font-size: 0.95rem;
@@ -1578,8 +1633,8 @@ input:focus-visible {
 
 /* Op het donkere startscherm omgekeerd, anders valt de melding weg. */
 .shell.is-home .update-toast {
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--on-bar);
+  color: var(--bar);
 }
 
 .update-toast .btn {
@@ -1628,10 +1683,10 @@ input:focus-visible {
   min-height: 100svh;
   background:
     radial-gradient(85% 45% at 50% 50%, rgba(228, 96, 10, 0.24), transparent 70%),
-    var(--ink);
+    var(--bar);
   /* Recht afgesneden, net als de titelbalk op de andere tabs. */
   box-shadow: 0 2px 12px rgba(17, 22, 27, 0.2);
-  color: var(--paper);
+  color: var(--on-bar);
   text-align: center;
 }
 
@@ -1663,7 +1718,7 @@ input:focus-visible {
   background: var(--club);
   border-radius: 999px;
   font-weight: 700;
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .home-hero-title {
@@ -1689,12 +1744,15 @@ input:focus-visible {
   min-height: 3.5rem;
   margin-top: auto;
   padding: 1rem 2rem;
-  background: var(--club);
-  border-color: var(--club);
+  /* Iets dieper dan de clubkleur: witte tekst haalt zo ~4,6:1 contrast. */
+  background: #c4510a;
+  border-color: #c4510a;
   font-size: 1.2rem;
   font-weight: 700;
-  color: var(--paper);
-  box-shadow: 0 6px 18px rgba(228, 96, 10, 0.4);
+  color: var(--on-accent);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.45),
+    0 0 0 0 rgba(255, 255, 255, 0);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
@@ -1705,18 +1763,119 @@ input:focus-visible {
 
 .btn-start-hero:active {
   transform: scale(0.97);
-  box-shadow: 0 3px 10px rgba(228, 96, 10, 0.35);
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.4),
+    0 0 0 0 rgba(255, 255, 255, 0);
 }
 
 .btn-start-hero:focus-visible {
-  outline-color: var(--paper);
+  outline-color: var(--on-bar);
 }
 
-.home-hero-version {
-  margin: 1.4rem 0 0;
+.home-hero-foot {
+  margin-top: 3.5rem;
+}
+
+/* Thema en versie: standaard op de lichte/donkere achtergrond van de app,
+   in de hero met eigen kleuren op het donkere vlak. */
+.theme-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
   font-size: 0.7rem;
   letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--muted);
+  transition: padding 220ms ease;
+}
+
+.theme-pill.is-open {
+  padding-right: 0.6rem;
+}
+
+/* Dicht: enkel de huidige keuze blijft staan, de rest (andere keuzes,
+   scheidingslijn, versie) krimpt naar breedte 0 en vervaagt. */
+.theme-toggle {
+  display: flex;
+  margin-right: 0.35rem;
+  padding-right: 0.3rem;
+  border-right: 1px solid var(--line);
+  transition:
+    margin 220ms ease,
+    padding 220ms ease,
+    border-width 220ms ease,
+    border-color 220ms ease;
+}
+
+.theme-pill:not(.is-open) .theme-toggle {
+  margin-right: 0;
+  padding-right: 0;
+  border-right-width: 0;
+  border-right-color: transparent;
+}
+
+.theme-pill:not(.is-open) .theme-opt:not(.is-on),
+.theme-pill:not(.is-open) .theme-pill-version {
+  max-width: 0;
+  opacity: 0;
+}
+
+.theme-pill-version {
+  max-width: 5rem;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 220ms ease, opacity 180ms ease;
+}
+
+.theme-opt {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  max-width: 1.6rem;
+  overflow: hidden;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    max-width 220ms ease,
+    opacity 180ms ease,
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.theme-opt:hover {
+  color: var(--ink);
+}
+
+.theme-opt.is-on {
+  background: var(--line-soft);
+  color: var(--club);
+}
+
+.home-hero .theme-pill {
+  /* Dekkend, zodat de lijnen van het veld er niet door schemeren. */
+  background: linear-gradient(rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.06)), var(--bar);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.home-hero .theme-toggle {
+  border-right-color: rgba(255, 255, 255, 0.1);
+}
+
+.home-hero .theme-opt:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.home-hero .theme-opt.is-on {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--club);
 }
 
 .home-hero-link {
@@ -1745,7 +1904,11 @@ input:focus-visible {
 
 
 @media (prefers-reduced-motion: reduce) {
-  .btn-start-hero {
+  .btn-start-hero,
+  .theme-pill,
+  .theme-toggle,
+  .theme-opt,
+  .theme-pill-version {
     transition: none;
   }
 }
@@ -1764,10 +1927,15 @@ input:focus-visible {
 
   .board,
   .tabs,
+  .foot,
   .pane-squad,
   .pane-history,
   .pane-stats {
     grid-column: 1 / -1;
+  }
+
+  .foot-spacer {
+    display: none;
   }
 
   .tabs {
@@ -1885,7 +2053,7 @@ input:focus-visible {
   height: auto;
   margin-bottom: 1rem;
   border-radius: var(--radius);
-  background: var(--ink);
+  background: var(--bar);
 }
 
 /* Statistieken */
@@ -1983,7 +2151,7 @@ input:focus-visible {
   background: var(--away);
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .form-dot.is-w {
@@ -2045,7 +2213,7 @@ input:focus-visible {
 
 .stat-rank li:first-child .stat-rank-pos {
   background: var(--club);
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .stat-rank-name {
@@ -2128,13 +2296,19 @@ input:focus-visible {
   }
 }
 
-@keyframes glow {
-  0%,
-  100% {
-    box-shadow: 0 6px 18px rgba(228, 96, 10, 0.4);
+/* Een dunne witte ring die zacht naar buiten uitdeint; de rand van de
+   knop zelf blijft scherp. */
+@keyframes ping {
+  0% {
+    box-shadow:
+      0 8px 20px rgba(0, 0, 0, 0.45),
+      0 0 0 0 rgba(255, 255, 255, 0.3);
   }
-  50% {
-    box-shadow: 0 6px 30px rgba(228, 96, 10, 0.75);
+  70%,
+  100% {
+    box-shadow:
+      0 8px 20px rgba(0, 0, 0, 0.45),
+      0 0 0 10px rgba(255, 255, 255, 0);
   }
 }
 
@@ -2169,10 +2343,10 @@ input:focus-visible {
     /* "backwards" i.p.v. "both": anders blijft de eindstand van de animatie
        de indrukschaal van :active overschrijven. */
     fade-up 420ms cubic-bezier(0.2, 0.7, 0.2, 1) 300ms backwards,
-    glow 2.6s ease-in-out 1s infinite;
+    ping 2.6s ease-out 1s infinite;
 }
 
-.home-hero > .home-hero-version {
+.home-hero > .home-hero-foot {
   animation-delay: 360ms;
 }
 
@@ -2395,6 +2569,22 @@ input:focus-visible {
   animation: pop 320ms ease-out;
 }
 
+/* Klok stil: Start/Ga verder pulseert met dezelfde ring als de startknop,
+   in de tekstkleur zodat hij in licht én donker thema zichtbaar is. */
+.btn-clock:not(.is-running) {
+  animation: ping-ink 2.6s ease-out 1s infinite;
+}
+
+@keyframes ping-ink {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ink) 30%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--ink) 0%, transparent);
+  }
+}
+
 .tally,
 .penalty-col-head strong {
   display: inline-block;
@@ -2417,6 +2607,7 @@ input:focus-visible {
   .penalties-end,
   .grid .scorer,
   .btn-clock svg,
+  .btn-clock:not(.is-running),
   .tally,
   .penalty-col-head strong,
   .penalty-result,
@@ -2498,7 +2689,7 @@ input:focus-visible {
   background: var(--club);
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .start-step-label {
@@ -2590,7 +2781,7 @@ input:focus-visible {
 .pick-chip.is-on .pick-chip-check {
   background: var(--club);
   border-color: var(--club);
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 .dialog .start-warning {
@@ -2617,7 +2808,7 @@ input:focus-visible {
   background: var(--club);
   border-color: var(--club);
   font-weight: 700;
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {

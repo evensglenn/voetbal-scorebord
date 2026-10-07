@@ -161,6 +161,20 @@ function normalizeTeam(team) {
 const hadActivity = (t) =>
   Boolean(t.events?.length > 0 || (t.clocks ?? []).some((c) => c > 0))
 
+// Thema apart bewaard, zodat index.html het al kan zetten vóór React start
+// (geen flits van het verkeerde thema bij het openen).
+const THEME_KEY = 'scorebord-theme'
+const THEMES = ['auto', 'light', 'dark']
+
+function loadTheme() {
+  try {
+    const t = localStorage.getItem(THEME_KEY)
+    return THEMES.includes(t) ? t : 'auto'
+  } catch {
+    return 'auto'
+  }
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -416,11 +430,24 @@ export default function App() {
   const [viewingHistory, setViewingHistory] = useState(null)
   const [compactBoard, setCompactBoard] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [theme, setTheme] = useState(loadTheme)
   const [standalone] = useState(
     () =>
       window.matchMedia?.('(display-mode: standalone)').matches ||
       window.navigator.standalone === true,
   )
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (theme === 'auto') delete root.dataset.theme
+    else root.dataset.theme = theme
+    try {
+      if (theme === 'auto') localStorage.removeItem(THEME_KEY)
+      else localStorage.setItem(THEME_KEY, theme)
+    } catch {
+      // opslag geweigerd; het thema geldt dan enkel voor deze sessie
+    }
+  }, [theme])
 
   useEffect(() => {
     try {
@@ -1169,6 +1196,8 @@ export default function App() {
             team={match}
             onStart={() => setStartingMatch(true)}
             onOpenSquad={() => setScreen('squad')}
+            theme={theme}
+            onTheme={setTheme}
           />
         )
       ) : screen === 'squad' ? (
@@ -1207,6 +1236,16 @@ export default function App() {
         />
       ) : (
         <Stats teams={state.teams} history={state.history} defaultTeamId={state.activeTeamId} />
+      )}
+
+      {/* Op het startscherm zit dit in de hero; elders onderaan de pagina. */}
+      {!(screen === 'match' && !match.started) && (
+        <>
+          <div className="foot-spacer" aria-hidden="true" />
+          <footer className="foot">
+            <ThemePill theme={theme} onTheme={setTheme} />
+          </footer>
+        </>
       )}
 
 
@@ -2083,7 +2122,7 @@ function Squad({
 
 // Startscherm zolang er geen wedstrijd bezig is: titel, ploeg en een
 // duidelijke aftrapknop in één vlak.
-function Home({ team, onStart, onOpenSquad }) {
+function Home({ team, onStart, onOpenSquad, theme, onTheme }) {
   const cfg = AGE_CONFIG[team.ageGroup] ?? AGE_CONFIG.U9
 
   return (
@@ -2122,8 +2161,69 @@ function Home({ team, onStart, onOpenSquad }) {
             Voeg eerst spelers toe →
           </button>
         )}
-        <p className="home-hero-version">v{APP_VERSION}</p>
+        <div className="home-hero-foot">
+          <ThemePill theme={theme} onTheme={onTheme} />
+        </div>
       </section>
+    </div>
+  )
+}
+
+// Thema en versie in één klein pilletje. Dicht toont het enkel het icoon
+// van het huidige thema; aantikken klapt de keuzes en het versienummer open.
+function ThemePill({ theme, onTheme }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const current = THEME_OPTIONS.find((o) => o.value === theme) ?? THEME_OPTIONS[1]
+
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (e) => {
+      if (!ref.current?.contains(e.target)) setOpen(false)
+    }
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  // Alles blijft in de DOM: dicht krimpen de andere keuzes en de versie naar
+  // breedte 0, zodat het open- en dichtklappen vloeiend kan animeren.
+  return (
+    <div className={open ? 'theme-pill is-open' : 'theme-pill'} ref={ref}>
+      <div className="theme-toggle" role="group" aria-label="Thema">
+        {THEME_OPTIONS.map(({ value, label, Icon }) => {
+          const isOn = value === theme
+          const hidden = !open && !isOn
+          return (
+            <button
+              key={value}
+              className={isOn ? 'theme-opt is-on' : 'theme-opt'}
+              onClick={() => {
+                if (!open) return setOpen(true)
+                onTheme(value)
+                setOpen(false)
+              }}
+              aria-label={open ? label : `${current.label}. Thema kiezen`}
+              aria-pressed={open ? isOn : undefined}
+              aria-expanded={open ? undefined : 'false'}
+              aria-hidden={hidden || undefined}
+              tabIndex={hidden ? -1 : undefined}
+              title={label}
+            >
+              <Icon />
+            </button>
+          )
+        })}
+      </div>
+      <span className="theme-pill-version" aria-hidden={!open || undefined}>
+        v{APP_VERSION}
+      </span>
     </div>
   )
 }
@@ -2674,6 +2774,50 @@ function TrashIcon() {
     </svg>
   )
 }
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false">
+      <circle cx="10" cy="10" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M10 2.5v1.8M10 15.7v1.8M2.5 10h1.8M15.7 10h1.8M4.7 4.7l1.3 1.3M14 14l1.3 1.3M4.7 15.3 6 14M14 6l1.3-1.3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function AutoThemeIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false">
+      <rect x="2.8" y="3.8" width="14.4" height="9.8" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M7 16.8h6M10 13.6v3.2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false">
+      <path
+        d="M16.2 12.2A6.6 6.6 0 0 1 7.8 3.8a6.6 6.6 0 1 0 8.4 8.4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Licht thema', Icon: SunIcon },
+  { value: 'auto', label: 'Thema van het toestel volgen', Icon: AutoThemeIcon },
+  { value: 'dark', label: 'Donker thema', Icon: MoonIcon },
+]
 
 function LiveIcon() {
   return (
