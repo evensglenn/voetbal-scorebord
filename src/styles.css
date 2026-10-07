@@ -1660,7 +1660,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  margin-top: 1.4rem;
+  margin-top: 0.75rem;
   font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.7);
 }
@@ -1674,7 +1674,7 @@ input:focus-visible {
 }
 
 .home-hero-title {
-  margin: 1rem 0 0;
+  margin: 1.4rem 0 0;
   font-size: 1.9rem;
   font-weight: 700;
   line-height: 1.1;

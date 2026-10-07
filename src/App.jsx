@@ -2100,6 +2100,12 @@ function Home({ team, onStart, onOpenSquad }) {
           <span className="board-title-sub">Scorebord</span>
         </h1>
         <img className="home-hero-logo" src={CLUB_LOGO} alt="" />
+        <h2 className="home-hero-title">
+          <span className="home-hero-ball" aria-hidden="true">
+            ⚽
+          </span>
+          Klaar voor de aftrap?
+        </h2>
         <div className="home-hero-meta">
           <span className="age-chip">{team.ageGroup}</span>
           <span>{FORMAT_LABELS[cfg.format] ?? cfg.format}</span>
@@ -2108,12 +2114,6 @@ function Home({ team, onStart, onOpenSquad }) {
             {team.periodsCount} × {team.periodMinutes}'
           </span>
         </div>
-        <h2 className="home-hero-title">
-          <span className="home-hero-ball" aria-hidden="true">
-            ⚽
-          </span>
-          Klaar voor de aftrap?
-        </h2>
         <p className="home-hero-sub">
           {team.players.length === 0
             ? 'Nog geen spelers in deze ploeg.'
