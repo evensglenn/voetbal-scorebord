@@ -840,7 +840,7 @@ export default function App() {
   }
 
   return (
-    <div className="shell">
+    <div className={screen === 'match' && !match.started ? 'shell is-home' : 'shell'}>
       {/* Op het startscherm zit de titel mee in de startkaart. */}
       {(screen !== 'match' || match.started) && (
         <Scoreboard
@@ -1208,11 +1208,6 @@ export default function App() {
       ) : (
         <Stats teams={state.teams} history={state.history} defaultTeamId={state.activeTeamId} />
       )}
-
-      <div className="foot-spacer" aria-hidden="true" />
-      <footer className="foot">
-        <p>v{APP_VERSION}</p>
-      </footer>
 
 
       {viewingHistory && (
@@ -2127,6 +2122,7 @@ function Home({ team, onStart, onOpenSquad }) {
             Voeg eerst spelers toe →
           </button>
         )}
+        <p className="home-hero-version">v{APP_VERSION}</p>
       </section>
     </div>
   )

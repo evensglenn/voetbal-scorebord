@@ -41,11 +41,9 @@ body {
   min-height: 100svh;
 }
 
-/* Duwt de footer nooit hoger dan net boven de tabbalk, ook als de pagina
-   verder leeg is; bij lange inhoud krimpt hij gewoon naar 0 en scrollt de
-   footer gewoon mee zoals voorheen. */
-.foot-spacer {
-  flex: 1 0 auto;
+/* Startscherm: de hero loopt door tot onder de tabbalk. */
+.shell.is-home {
+  padding-bottom: 0;
 }
 
 /* Scorebord */
@@ -1406,17 +1404,6 @@ input:focus-visible {
   color: var(--muted);
 }
 
-.foot {
-  margin: 1.5rem 1rem 0;
-  font-size: 0.75rem;
-  line-height: 1.45;
-  text-align: center;
-  color: var(--muted);
-}
-
-.foot p {
-  margin: 0;
-}
 
 
 @media (min-width: 30rem) {
@@ -1589,6 +1576,12 @@ input:focus-visible {
   animation: dialog-in 180ms ease-out;
 }
 
+/* Op het donkere startscherm omgekeerd, anders valt de melding weg. */
+.shell.is-home .update-toast {
+  background: var(--paper);
+  color: var(--ink);
+}
+
 .update-toast .btn {
   flex: 0 0 auto;
   min-height: 2.25rem;
@@ -1628,11 +1621,11 @@ input:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Loopt door tot bovenaan het scherm: titel en startkaart vormen één vlak. */
-  padding: calc(1.35rem + env(safe-area-inset-top, 0px)) 1.25rem 2rem;
-  /* Vult het scherm tot net boven de versie en de tabbalk, zodat de inhoud
-     kan ademen. */
-  min-height: calc(100svh - 9.5rem - env(safe-area-inset-bottom, 0px));
+  /* Loopt door tot bovenaan en onderaan het scherm: titel en startkaart
+     vormen één vlak; onderaan blijft ruimte vrij voor de tabbalk. */
+  padding: calc(1.35rem + env(safe-area-inset-top, 0px)) 1.25rem
+    calc(4.9rem + env(safe-area-inset-bottom, 0px));
+  min-height: 100svh;
   background:
     radial-gradient(85% 45% at 50% 50%, rgba(228, 96, 10, 0.24), transparent 70%),
     var(--ink);
@@ -1719,6 +1712,13 @@ input:focus-visible {
   outline-color: var(--paper);
 }
 
+.home-hero-version {
+  margin: 1.4rem 0 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.35);
+}
+
 .home-hero-link {
   margin-top: 0.8rem;
   padding: 0.4rem;
@@ -1764,15 +1764,10 @@ input:focus-visible {
 
   .board,
   .tabs,
-  .foot,
   .pane-squad,
   .pane-history,
   .pane-stats {
     grid-column: 1 / -1;
-  }
-
-  .foot-spacer {
-    display: none;
   }
 
   .tabs {
@@ -1852,10 +1847,6 @@ input:focus-visible {
 
   .timeline {
     padding-right: 1rem;
-  }
-
-  .foot {
-    margin-top: 1.2rem;
   }
 }
 
@@ -2179,6 +2170,10 @@ input:focus-visible {
        de indrukschaal van :active overschrijven. */
     fade-up 420ms cubic-bezier(0.2, 0.7, 0.2, 1) 300ms backwards,
     glow 2.6s ease-in-out 1s infinite;
+}
+
+.home-hero > .home-hero-version {
+  animation-delay: 360ms;
 }
 
 /* Tabs: de pagina schuift zacht binnen bij het wisselen. */
