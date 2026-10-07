@@ -2435,3 +2435,204 @@ input:focus-visible {
     transition: none;
   }
 }
+
+/* Nieuwe wedstrijd: breder venster met genummerde stappen en
+   een vaste startknop onderaan; enkel het midden scrollt. */
+.dialog-start {
+  display: flex;
+  flex-direction: column;
+  max-width: 30rem;
+  max-height: calc(100svh - 2rem);
+  padding: 0;
+  overflow: hidden;
+}
+
+.start-head {
+  flex: 0 0 auto;
+  padding: 1.1rem 1.25rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog .start-head h2 {
+  margin: 0;
+}
+
+.dialog .start-summary {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.start-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: 0;
+  padding: 1.1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.start-body section > * + * {
+  margin-top: 0.6rem;
+}
+
+.start-body .team-switch {
+  margin: 0;
+}
+
+.start-body .team-switch + *,
+.start-body .start-step + * {
+  margin-top: 0;
+}
+
+.start-step {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.6rem;
+}
+
+.start-step-num {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--club);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--paper);
+}
+
+.start-step-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.start-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.start-step-aside {
+  margin-left: auto;
+}
+
+.start-body > section > .field {
+  display: block;
+  width: 100%;
+}
+
+.start-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.dialog .start-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.start-link {
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--club);
+  cursor: pointer;
+}
+
+.start-body .rules-link {
+  margin-top: 0.4rem;
+}
+
+.pick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.6rem;
+  padding: 0.4rem 0.8rem 0.4rem 0.5rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.pick-chip-check {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pick-chip.is-on {
+  background: rgba(228, 96, 10, 0.1);
+  border-color: var(--club);
+  color: var(--ink);
+}
+
+.pick-chip.is-on .pick-chip-check {
+  background: var(--club);
+  border-color: var(--club);
+  color: var(--paper);
+}
+
+.dialog .start-warning {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  background: rgba(209, 51, 44, 0.08);
+  border: 1px solid rgba(209, 51, 44, 0.3);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  color: var(--danger);
+}
+
+.start-foot {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.5rem;
+  padding: 0.8rem 1.25rem;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+
+.btn-go {
+  flex: 1;
+  background: var(--club);
+  border-color: var(--club);
+  font-weight: 700;
+  color: var(--paper);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pick-chip {
+    transition: none;
+  }
+}
+
+.start-body .sub-choice {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}

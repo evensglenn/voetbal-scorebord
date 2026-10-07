@@ -2846,6 +2846,16 @@ function SubSettings({ subMinutes, periodMinutes, onSave, onCancel }) {
   )
 }
 
+function StartStep({ num, children, aside }) {
+  return (
+    <div className="start-step">
+      <span className="start-step-num">{num}</span>
+      <span className="start-step-label">{children}</span>
+      {aside}
+    </div>
+  )
+}
+
 function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
   const panel = useRef(null)
   const [teamId, setTeamId] = useState(defaultTeamId)
@@ -2902,10 +2912,23 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
 
   // Rechtstreeks in <body>, zodat een geanimeerde ouder (transform) het
   // venster niet kan insluiten of onder de tabbalk kan duwen.
+  const selected = team.players.filter((p) => activePlayerIds.includes(p.id)).length
+  const allSelected = selected === team.players.length
+  const summary = [
+    team.ageGroup,
+    `${home ? 'thuis' : 'uit'} tegen ${opponent.trim() || OPPONENT}`,
+    `${periodsCount} × ${periodMinutes}'`,
+  ].join(' · ')
+
+  // Zonder ploegkeuze (één ploeg) begint de nummering bij de tegenstander.
+  const first = teams.length > 1 ? 1 : 0
+
+  // Rechtstreeks in <body>, zodat een geanimeerde ouder (transform) het
+  // venster niet kan insluiten of onder de tabbalk kan duwen.
   return createPortal(
     <div className={overlayClass} onClick={cancel}>
       <div
-        className="dialog dialog-wide"
+        className="dialog dialog-start"
         role="dialog"
         aria-modal="true"
         aria-labelledby="start-match-title"
@@ -2913,142 +2936,175 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
         ref={panel}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="start-match-title">Nieuwe wedstrijd</h2>
+        <header className="start-head">
+          <h2 id="start-match-title">Nieuwe wedstrijd</h2>
+          <p className="start-summary">{summary}</p>
+        </header>
 
-        <div className="team-switch">
-          {teams.map((t) => (
-            <button
-              key={t.id}
-              className={t.id === teamId ? 'team-chip is-on' : 'team-chip'}
-              onClick={() => selectTeam(t.id)}
-              aria-pressed={t.id === teamId}
-            >
-              {t.ageGroup}
-            </button>
-          ))}
-        </div>
-
-        <div className="panel-card">
-          <label className="choice-label" htmlFor="new-match-opponent">
-            Tegenstander
-          </label>
-          <input
-            id="new-match-opponent"
-            className="field"
-            value={opponent}
-            onChange={(e) => setOpponent(e.target.value)}
-            placeholder={OPPONENT}
-            aria-label="Naam tegenstander"
-          />
-        </div>
-
-        <div className="panel-card choice-row">
-          <span className="choice-label">{TEAM} speelt</span>
-          <div className="periods">
-            <button
-              className={home ? 'per is-on' : 'per'}
-              onClick={() => setHome(true)}
-              aria-pressed={home}
-            >
-              Thuis
-            </button>
-            <button
-              className={home ? 'per' : 'per is-on'}
-              onClick={() => setHome(false)}
-              aria-pressed={!home}
-            >
-              Uit
-            </button>
-          </div>
-        </div>
-
-        <div className="panel-card">
-          <span className="choice-label">
-            Periodes ({team.ageGroup} · {FORMAT_LABELS[cfg.format]})
-          </span>
-          <div className="row row-flush">
-            <label className="field-group">
-              <span className="field-group-label">Periodes</span>
-              <NumberSelect
-                min={1}
-                max={12}
-                value={periodsCount}
-                onChange={setPeriodsCount}
-                aria-label="Aantal periodes"
-              />
-            </label>
-            <label className="field-group">
-              <span className="field-group-label">Minuten per periode</span>
-              <NumberSelect
-                min={1}
-                max={45}
-                value={periodMinutes}
-                onChange={setPeriodMinutes}
-                aria-label="Minuten per periode"
-              />
-            </label>
-          </div>
-          {!isDefault && (
-            <button className="btn btn-quiet btn-reset-defaults" onClick={resetDefaults}>
-              Herstel standaard ({cfg.periods} × {cfg.minutes}&apos;)
-            </button>
+        <div className="start-body">
+          {teams.length > 1 && (
+            <section>
+              <StartStep num={1}>Ploeg</StartStep>
+              <div className="team-switch">
+                {teams.map((t) => (
+                  <button
+                    key={t.id}
+                    className={t.id === teamId ? 'team-chip is-on' : 'team-chip'}
+                    onClick={() => selectTeam(t.id)}
+                    aria-pressed={t.id === teamId}
+                  >
+                    {t.ageGroup}
+                  </button>
+                ))}
+              </div>
+            </section>
           )}
-        </div>
 
-        <div className="panel-card">
-          <span className="choice-label">Wisselmelding</span>
-          <SubChoice
-            subMinutes={subMinutes}
-            periodMinutes={periodMinutes}
-            onChange={setSubMinutes}
-          />
-        </div>
-
-        <div className="panel-card">
-          <span className="choice-label">Wie speelt mee?</span>
-          {team.players.length === 0 ? (
-            <p className="empty">Voeg eerst spelers toe bij Ploegen.</p>
-          ) : (
-            <div className="player-select">
-              {team.players.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={activePlayerIds.includes(p.id) ? 'team-chip is-on' : 'team-chip'}
-                  onClick={() => togglePlayer(p.id)}
-                  aria-pressed={activePlayerIds.includes(p.id)}
-                >
-                  {p.name}
-                </button>
-              ))}
+          <section>
+            <StartStep num={first + 1}>Tegenstander</StartStep>
+            <input
+              id="new-match-opponent"
+              className="field"
+              value={opponent}
+              onChange={(e) => setOpponent(e.target.value)}
+              placeholder="Naam van de tegenstander"
+              aria-label="Naam tegenstander"
+            />
+            <div className="start-seg" role="group" aria-label={`${TEAM} speelt`}>
+              <button
+                className={home ? 'per is-on' : 'per'}
+                onClick={() => setHome(true)}
+                aria-pressed={home}
+              >
+                Thuis
+              </button>
+              <button
+                className={home ? 'per' : 'per is-on'}
+                onClick={() => setHome(false)}
+                aria-pressed={!home}
+              >
+                Uit
+              </button>
             </div>
+          </section>
+
+          <section>
+            <StartStep num={first + 2}>Speeltijd</StartStep>
+            <div className="row row-flush">
+              <label className="field-group">
+                <span className="field-group-label">Periodes</span>
+                <NumberSelect
+                  min={1}
+                  max={12}
+                  value={periodsCount}
+                  onChange={setPeriodsCount}
+                  aria-label="Aantal periodes"
+                />
+              </label>
+              <label className="field-group">
+                <span className="field-group-label">Minuten per periode</span>
+                <NumberSelect
+                  min={1}
+                  max={45}
+                  value={periodMinutes}
+                  onChange={setPeriodMinutes}
+                  aria-label="Minuten per periode"
+                />
+              </label>
+            </div>
+            <p className="start-note">
+              {isDefault
+                ? `Standaard voor ${team.ageGroup} (${FORMAT_LABELS[cfg.format]}).`
+                : `Standaard voor ${team.ageGroup} is ${cfg.periods} × ${cfg.minutes}'.`}{' '}
+              {!isDefault && (
+                <button className="start-link" onClick={resetDefaults}>
+                  Herstel
+                </button>
+              )}
+            </p>
+            <a
+              className="rules-link"
+              href={FORMAT_RULES_URL[cfg.format]}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <InfoIcon />
+              Spelreglement {cfg.format} bekijken (pdf)
+            </a>
+          </section>
+
+          <section>
+            <StartStep num={first + 3}>Wisselmelding</StartStep>
+            <SubChoice
+              subMinutes={subMinutes}
+              periodMinutes={periodMinutes}
+              onChange={setSubMinutes}
+            />
+          </section>
+
+          <section>
+            <StartStep
+              num={first + 4}
+              aside={
+                team.players.length > 0 && (
+                  <button
+                    className="start-link start-step-aside"
+                    onClick={() =>
+                      setActivePlayerIds(allSelected ? [] : team.players.map((p) => p.id))
+                    }
+                  >
+                    {allSelected ? 'Niemand' : 'Iedereen'}
+                  </button>
+                )
+              }
+            >
+              Wie speelt mee?
+              {team.players.length > 0 && (
+                <span className="start-count">
+                  {selected}/{team.players.length}
+                </span>
+              )}
+            </StartStep>
+            {team.players.length === 0 ? (
+              <p className="start-note">Voeg eerst spelers toe bij Ploegen.</p>
+            ) : (
+              <div className="player-select">
+                {team.players.map((p) => {
+                  const on = activePlayerIds.includes(p.id)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={on ? 'pick-chip is-on' : 'pick-chip'}
+                      onClick={() => togglePlayer(p.id)}
+                      aria-pressed={on}
+                    >
+                      <span className="pick-chip-check" aria-hidden="true">
+                        {on ? '✓' : ''}
+                      </span>
+                      {p.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+
+          {hasProgress && (
+            <p className="start-warning">
+              De huidige stand ({us}–{them}) en tijdslijn van deze ploeg worden gewist.
+            </p>
           )}
         </div>
 
-        <a
-          className="rules-link"
-          href={FORMAT_RULES_URL[cfg.format]}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <InfoIcon />
-          Spelreglement {cfg.format} bekijken (pdf)
-        </a>
-
-        {hasProgress && (
-          <p className="empty">
-            De huidige stand ({us}–{them}) en tijdslijn van deze ploeg worden gewist.
-          </p>
-        )}
-
-        <div className="dialog-actions">
+        <footer className="start-foot">
           <button className="btn" onClick={cancel}>
             Annuleer
           </button>
-          <button className="btn btn-primary" onClick={start}>
-            Start
+          <button className="btn btn-go" onClick={start}>
+            Start wedstrijd
           </button>
-        </div>
+        </footer>
       </div>
     </div>,
     document.body,
