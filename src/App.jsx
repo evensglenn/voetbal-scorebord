@@ -852,10 +852,20 @@ export default function App() {
       )}
 
       <nav className="tabs">
+        {/* Tijdens een wedstrijd springt Live eruit; zolang de klok loopt,
+            pulseert het icoon. */}
         <button
-          className={screen === 'match' ? 'tab is-on' : 'tab'}
+          className={[
+            'tab',
+            screen === 'match' && 'is-on',
+            match.started && 'is-live',
+            running && 'is-running',
+          ]
+            .filter(Boolean)
+            .join(' ')}
           onClick={() => setScreen('match')}
           aria-current={screen === 'match' ? 'page' : undefined}
+          aria-label={match.started ? 'Live – wedstrijd bezig' : undefined}
         >
           <LiveIcon />
           <span>Live</span>
@@ -873,8 +883,8 @@ export default function App() {
           onClick={() => setScreen('history')}
           aria-current={screen === 'history' ? 'page' : undefined}
         >
-          <HistoryIcon />
-          <span>Vorige wedstrijden</span>
+          <ResultsIcon />
+          <span>Uitslagen</span>
         </button>
         <button
           className={screen === 'stats' ? 'tab is-on' : 'tab'}
@@ -1225,7 +1235,7 @@ export default function App() {
       {ending && (
         <Confirm
           title="Wedstrijd beëindigen?"
-          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} wordt bewaard bij Vorige wedstrijden.`}
+          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} wordt bewaard bij Uitslagen.`}
           confirmLabel="Ja, beëindig"
           danger
           onConfirm={endMatch}
@@ -1236,7 +1246,7 @@ export default function App() {
       {canceling && (
         <Confirm
           title="Wedstrijd annuleren?"
-          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} gaat verloren en wordt niet bewaard bij Vorige wedstrijden.`}
+          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} gaat verloren en wordt niet bewaard bij Uitslagen.`}
           confirmLabel="Ja, annuleer"
           danger
           onConfirm={cancelMatch}
@@ -1482,8 +1492,17 @@ function Pitch({ vertical = false }) {
 }
 
 function Scoreboard({ started, home, score, opponentName, compact }) {
-  const ours = { name: TEAM, goals: score.us, ours: true }
-  const theirs = { name: opponentName, goals: score.them, ours: false }
+  // Een cijfer "popt" enkel wanneer het verandert: door de key wordt het
+  // element dan opnieuw aangemaakt, en enkel waarden die afwijken van de
+  // stand bij het openen krijgen de animatie (dus niet bij elke tabwissel).
+  const initial = useRef(score)
+  const ours = { name: TEAM, goals: score.us, ours: true, pop: score.us !== initial.current.us }
+  const theirs = {
+    name: opponentName,
+    goals: score.them,
+    ours: false,
+    pop: score.them !== initial.current.them,
+  }
   const [left, right] = home ? [ours, theirs] : [theirs, ours]
 
   if (!started) {
@@ -1506,11 +1525,21 @@ function Scoreboard({ started, home, score, opponentName, compact }) {
       <div className="board-row">
         <div className="side">
           <span className={left.ours ? 'team-name team-name-ours' : 'team-name'}>{left.name}</span>
-          <span className={left.ours ? 'goals goals-ours' : 'goals'}>{left.goals}</span>
+          <span
+            key={left.goals}
+            className={['goals', left.ours && 'goals-ours', left.pop && 'is-pop'].filter(Boolean).join(' ')}
+          >
+            {left.goals}
+          </span>
         </div>
         <div className="side side-right">
           <span className={right.ours ? 'team-name team-name-ours' : 'team-name'}>{right.name}</span>
-          <span className={right.ours ? 'goals goals-ours' : 'goals'}>{right.goals}</span>
+          <span
+            key={right.goals}
+            className={['goals', right.ours && 'goals-ours', right.pop && 'is-pop'].filter(Boolean).join(' ')}
+          >
+            {right.goals}
+          </span>
         </div>
       </div>
     </header>
@@ -1615,7 +1644,7 @@ function LastAction({ match, score, opponentName, onUndo }) {
   const label = last.team === 'them' ? opponentName : player?.name ? player.name : 'Own goal'
 
   return (
-    <section className="last-action" aria-live="polite">
+    <section key={last.id} className="last-action" aria-live="polite">
       <div className="last-action-copy">
         <span className="last-action-check" aria-hidden="true">✓</span>
         <span>
@@ -2398,7 +2427,7 @@ function History({ history, onView, onDelete }) {
       {confirmingDelete && (
         <Confirm
           title="Wedstrijd verwijderen?"
-          body={`De bewaarde wedstrijd tegen ${confirmingDelete.theirName} (${confirmingDelete.date}) wordt definitief verwijderd uit Vorige wedstrijden.`}
+          body={`De bewaarde wedstrijd tegen ${confirmingDelete.theirName} (${confirmingDelete.date}) wordt definitief verwijderd uit Uitslagen.`}
           confirmLabel="Ja, verwijder"
           danger
           onConfirm={() => {
@@ -2547,8 +2576,8 @@ function TrashIcon() {
 function LiveIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-      <circle cx="12" cy="12" r="3" fill="currentColor" />
-      <path d="M6.7 6.7a7.5 7.5 0 0 0 0 10.6M17.3 6.7a7.5 7.5 0 0 1 0 10.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle className="live-dot" cx="12" cy="12" r="3" fill="currentColor" />
+      <path className="live-waves" d="M6.7 6.7a7.5 7.5 0 0 0 0 10.6M17.3 6.7a7.5 7.5 0 0 1 0 10.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   )
 }
@@ -2563,18 +2592,16 @@ function TeamIcon() {
   )
 }
 
-function HistoryIcon() {
+// Klein scorebord: twee cijfervakjes met een scheiding ertussen.
+function ResultsIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-      <path
-        d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path d="M3.5 4.5v3.5H7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 8v4.5l3 2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2.5" />
+        <path d="M12 8.5v7" />
+        <rect x="6" y="9" width="3" height="6" rx="1" />
+        <rect x="15" y="9" width="3" height="6" rx="1" />
+      </g>
     </svg>
   )
 }
