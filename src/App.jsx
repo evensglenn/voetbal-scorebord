@@ -258,12 +258,7 @@ function groupScorers(scorers) {
       groups.push({ names: [s.name], goals: s.goals, hattricks: s.hattricks })
     }
   }
-  return groups.map((g) => ({
-    name: formatNames(g.names),
-    names: g.names,
-    goals: g.goals,
-    hattricks: g.hattricks,
-  }))
+  return groups.map((g) => ({ name: formatNames(g.names), goals: g.goals, hattricks: g.hattricks }))
 }
 
 // Zet een (lopende of afgewerkte) match om in het data-formaat dat de
@@ -1138,10 +1133,8 @@ export default function App() {
         ) : (
           <Home
             team={match}
-            history={state.history}
             onStart={() => setStartingMatch(true)}
             onOpenSquad={() => setScreen('squad')}
-            onOpenHistory={() => setScreen('history')}
           />
         )
       ) : screen === 'squad' ? (
@@ -1978,26 +1971,9 @@ function Squad({
   )
 }
 
-// Startscherm zolang er geen wedstrijd bezig is: een duidelijke aftrapknop,
-// plus een blik op hoe het de ploeg tot nu toe verging.
-function Home({ team, history, onStart, onOpenSquad, onOpenHistory }) {
-  // De historiek kent geen ploeg-id, enkel de leeftijdscategorie.
-  const played = history.filter((h) => h.ageGroup === team.ageGroup)
-
-  const tally = {}
-  for (const h of played) {
-    for (const s of h.scorers ?? []) {
-      if (s.name === 'Own goal') continue
-      // Oudere historiek bewaarde enkel de samengevoegde regel ("A, B & C").
-      for (const name of s.names ?? s.name.split(/, | & /)) {
-        tally[name] = (tally[name] ?? 0) + s.goals
-      }
-    }
-  }
-  const topScorers = Object.entries(tally)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 3)
-
+// Startscherm zolang er geen wedstrijd bezig is: titel, ploeg en een
+// duidelijke aftrapknop in één vlak.
+function Home({ team, onStart, onOpenSquad }) {
   const cfg = AGE_CONFIG[team.ageGroup] ?? AGE_CONFIG.U9
 
   return (
@@ -2033,33 +2009,6 @@ function Home({ team, history, onStart, onOpenSquad, onOpenHistory }) {
           </button>
         )}
       </section>
-
-      {played.length === 0 ? (
-        <p className="empty home-empty">
-          Na je eerste wedstrijd verschijnen hier de topschutters van je {team.ageGroup}.
-        </p>
-      ) : (
-        <>
-          {topScorers.length > 0 && (
-            <>
-              <h2 className="section-title">Topschutters</h2>
-              <ol className="home-scorers">
-                {topScorers.map(([name, goals], i) => (
-                  <li key={name}>
-                    <span className="home-scorer-rank">{i + 1}</span>
-                    <span className="home-scorer-name">{name}</span>
-                    <span className="home-scorer-goals">{goals}</span>
-                  </li>
-                ))}
-              </ol>
-            </>
-          )}
-
-          <button className="home-more" onClick={onOpenHistory}>
-            Bekijk volledige historiek →
-          </button>
-        </>
-      )}
     </div>
   )
 }
