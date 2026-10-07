@@ -258,7 +258,12 @@ function groupScorers(scorers) {
       groups.push({ names: [s.name], goals: s.goals, hattricks: s.hattricks })
     }
   }
-  return groups.map((g) => ({ name: formatNames(g.names), goals: g.goals, hattricks: g.hattricks }))
+  return groups.map((g) => ({
+    name: formatNames(g.names),
+    names: g.names,
+    goals: g.goals,
+    hattricks: g.hattricks,
+  }))
 }
 
 // Zet een (lopende of afgewerkte) match om in het data-formaat dat de
@@ -772,7 +777,12 @@ export default function App() {
   }
 
   const endMatch = () => {
-    const finished = { id: uid(), finishedAt: new Date().toISOString(), ...buildSummary(match) }
+    const finished = {
+      id: uid(),
+      teamId: match.id,
+      finishedAt: new Date().toISOString(),
+      ...buildSummary(match),
+    }
     setState((s) => ({
       ...s,
       history: [finished, ...s.history],
@@ -864,7 +874,15 @@ export default function App() {
           aria-current={screen === 'history' ? 'page' : undefined}
         >
           <HistoryIcon />
-          <span>Historiek</span>
+          <span>Vorige wedstrijden</span>
+        </button>
+        <button
+          className={screen === 'stats' ? 'tab is-on' : 'tab'}
+          onClick={() => setScreen('stats')}
+          aria-current={screen === 'stats' ? 'page' : undefined}
+        >
+          <StatsIcon />
+          <span>Statistieken</span>
         </button>
       </nav>
 
@@ -1164,12 +1182,14 @@ export default function App() {
             }))
           }
         />
-      ) : (
+      ) : screen === 'history' ? (
         <History
           history={state.history}
           onView={setViewingHistory}
           onDelete={deleteHistoryEntry}
         />
+      ) : (
+        <Stats teams={state.teams} history={state.history} defaultTeamId={state.activeTeamId} />
       )}
 
       <div className="foot-spacer" aria-hidden="true" />
@@ -1206,7 +1226,7 @@ export default function App() {
       {ending && (
         <Confirm
           title="Wedstrijd beëindigen?"
-          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} wordt bewaard in de Historiek.`}
+          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} wordt bewaard bij Vorige wedstrijden.`}
           confirmLabel="Ja, beëindig"
           danger
           onConfirm={endMatch}
@@ -1217,7 +1237,7 @@ export default function App() {
       {canceling && (
         <Confirm
           title="Wedstrijd annuleren?"
-          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} gaat verloren en wordt niet bewaard in de Historiek.`}
+          body={`Eindstand ${score.us}–${score.them} tegen ${opponentName} gaat verloren en wordt niet bewaard bij Vorige wedstrijden.`}
           confirmLabel="Ja, annuleer"
           danger
           onConfirm={cancelMatch}
@@ -1993,15 +2013,19 @@ function Home({ team, onStart, onOpenSquad }) {
             {team.periodsCount} × {team.periodMinutes}'
           </span>
         </div>
-        <h2 className="home-hero-title">Klaar voor de aftrap?</h2>
+        <h2 className="home-hero-title">
+          <span className="home-hero-ball" aria-hidden="true">
+            ⚽
+          </span>
+          Klaar voor de aftrap?
+        </h2>
         <p className="home-hero-sub">
           {team.players.length === 0
             ? 'Nog geen spelers in deze ploeg.'
             : `${team.players.length} ${team.players.length === 1 ? 'speler' : 'spelers'} in de kern`}
         </p>
         <button className="btn btn-start-hero" onClick={onStart}>
-          <PlayIcon />
-          <span>Nieuwe wedstrijd</span>
+          Start nieuwe wedstrijd
         </button>
         {team.players.length === 0 && (
           <button className="home-hero-link" onClick={onOpenSquad}>
@@ -2013,12 +2037,329 @@ function Home({ team, onStart, onOpenSquad }) {
   )
 }
 
+// Uitslag vanuit ons standpunt na de reguliere speeltijd (W/G/V); een
+// strafschoppenreeks telt apart mee.
+function resultOf(h) {
+  const diff = ourGoals(h) - theirGoals(h)
+  return diff > 0 ? 'W' : diff < 0 ? 'V' : 'G'
+}
+const ourGoals = (h) => (h.left.ours ? h.left : h.right).goals
+const theirGoals = (h) => (h.left.ours ? h.right : h.left).goals
+
+const RESULT_LABELS = { W: 'Winst', G: 'Gelijk', V: 'Verlies' }
+
+// Bewaarde wedstrijden van vóór het teamId-veld kennen enkel de
+// leeftijdscategorie; die vallen terug op de ploeg met die categorie.
+function playedBy(team, history) {
+  return history.filter((h) => (h.teamId ? h.teamId === team.id : h.ageGroup === team.ageGroup))
+}
+
+function teamStats(played) {
+  const record = { W: 0, G: 0, V: 0 }
+  let goalsFor = 0
+  let goalsAgainst = 0
+  let biggestWin = null
+  let heaviestLoss = null
+  const perPeriod = []
+  const scorers = {}
+  const takers = {}
+  const shootouts = { won: 0, drawn: 0, lost: 0 }
+
+  for (const h of played) {
+    const us = ourGoals(h)
+    const them = theirGoals(h)
+    record[resultOf(h)] += 1
+    goalsFor += us
+    goalsAgainst += them
+    const diff = us - them
+    if (diff > 0 && (!biggestWin || diff > ourGoals(biggestWin) - theirGoals(biggestWin))) biggestWin = h
+    if (diff < 0 && (!heaviestLoss || diff < ourGoals(heaviestLoss) - theirGoals(heaviestLoss)))
+      heaviestLoss = h
+
+    for (const e of h.events ?? []) {
+      const i = Math.max(0, (e.period ?? 1) - 1)
+      perPeriod[i] ??= { us: 0, them: 0 }
+      perPeriod[i][e.team === 'us' ? 'us' : 'them'] += 1
+    }
+
+    for (const sc of h.scorers ?? []) {
+      if (sc.name === 'Own goal') continue
+      // Oudere historiek bewaarde enkel de samengevoegde regel ("A, B & C").
+      for (const name of sc.names ?? sc.name.split(/, | & /)) {
+        const row = (scorers[name] ??= { name, goals: 0, hattricks: 0, matches: 0 })
+        row.goals += sc.goals
+        row.hattricks += sc.hattricks ?? 0
+        row.matches += 1
+      }
+    }
+
+    const pens = h.penalties
+    if (pens) {
+      if (pens.us.scored > pens.them.scored) shootouts.won += 1
+      else if (pens.us.scored < pens.them.scored) shootouts.lost += 1
+      else shootouts.drawn += 1
+      for (const a of pens.attempts) {
+        if (a.team !== 'us') continue
+        const row = (takers[a.name] ??= { name: a.name, scored: 0, total: 0 })
+        row.total += 1
+        if (a.scored) row.scored += 1
+      }
+    }
+  }
+
+  return {
+    record,
+    goalsFor,
+    goalsAgainst,
+    biggestWin,
+    heaviestLoss,
+    perPeriod: Array.from(perPeriod, (p) => p ?? { us: 0, them: 0 }),
+    scorers: Object.values(scorers).sort(
+      (a, b) => b.goals - a.goals || b.hattricks - a.hattricks || a.name.localeCompare(b.name),
+    ),
+    takers: Object.values(takers),
+    shootouts,
+    // Historiek staat nieuwste eerst; de vorm leest van oud (links) naar nieuw.
+    form: played.slice(0, 5).map(resultOf).reverse(),
+  }
+}
+
+const scoreLine = (h) => `${ourGoals(h)}–${theirGoals(h)} tegen ${h.theirName}`
+
+function Stats({ teams, history, defaultTeamId }) {
+  const [teamId, setTeamId] = useState(defaultTeamId)
+  const [penaltySort, setPenaltySort] = useState('scored')
+  const [goalsView, setGoalsView] = useState('total')
+  const team = teams.find((t) => t.id === teamId) ?? teams[0]
+  const played = playedBy(team, history)
+  const st = teamStats(played)
+  // Doelpunten als totaal of als gemiddelde per wedstrijd (één decimaal).
+  const goals = (v) => (goalsView === 'avg' ? (v / n).toFixed(1).replace('.', ',') : v)
+  const shootoutCount = st.shootouts.won + st.shootouts.drawn + st.shootouts.lost
+  const rate = (p) => p.scored / p.total
+  const takers = [...st.takers].sort((a, b) =>
+    penaltySort === 'rate'
+      ? rate(b) - rate(a) || b.scored - a.scored || a.name.localeCompare(b.name)
+      : b.scored - a.scored || rate(b) - rate(a) || a.name.localeCompare(b.name),
+  )
+  const n = played.length
+
+  return (
+    <section className="pane-stats">
+      <h2 className="section-title">Statistieken</h2>
+      <div className="team-switch">
+        {teams.map((t) => (
+          <button
+            key={t.id}
+            className={t.id === team.id ? 'team-chip is-on' : 'team-chip'}
+            onClick={() => setTeamId(t.id)}
+            aria-pressed={t.id === team.id}
+          >
+            {t.ageGroup}
+          </button>
+        ))}
+      </div>
+
+      {n === 0 ? (
+        <p className="empty stats-empty">
+          Nog geen afgewerkte wedstrijden voor de {team.ageGroup}. Na een wedstrijd verschijnen hier
+          de cijfers.
+        </p>
+      ) : (
+        <>
+          <h2 className="section-title">Resultaten</h2>
+          <div className="stat-tiles">
+            <div className="stat-tile">
+              <strong>{n}</strong>
+              <span>{n === 1 ? 'wedstrijd' : 'wedstrijden'}</span>
+            </div>
+            <div className="stat-tile is-w">
+              <strong>{st.record.W}</strong>
+              <span>gewonnen</span>
+            </div>
+            <div className="stat-tile is-g">
+              <strong>{st.record.G}</strong>
+              <span>gelijk</span>
+            </div>
+            <div className="stat-tile is-v">
+              <strong>{st.record.V}</strong>
+              <span>verloren</span>
+            </div>
+          </div>
+
+          <div className="stat-card stat-form">
+            <span className="stat-card-label">Vorm</span>
+            <span className="form-dots">
+              {st.form.map((r, i) => (
+                <span key={i} className={`form-dot is-${r.toLowerCase()}`} title={RESULT_LABELS[r]}>
+                  {r}
+                </span>
+              ))}
+            </span>
+          </div>
+          <p className="stat-note">Laatste {st.form.length} wedstrijden, meest recente rechts.</p>
+
+          <h2 className="section-title">Doelpunten</h2>
+          <div className="stat-sort stat-sort-top">
+            <span className="choice-label">Toon</span>
+            <div className="periods">
+              <button
+                className={goalsView === 'total' ? 'per is-on' : 'per'}
+                onClick={() => setGoalsView('total')}
+                aria-pressed={goalsView === 'total'}
+              >
+                Totaal
+              </button>
+              <button
+                className={goalsView === 'avg' ? 'per is-on' : 'per'}
+                onClick={() => setGoalsView('avg')}
+                aria-pressed={goalsView === 'avg'}
+              >
+                Per wedstrijd
+              </button>
+            </div>
+          </div>
+          <div className="stat-tiles stat-tiles-3">
+            <div className="stat-tile">
+              <strong className="is-ours">{goals(st.goalsFor)}</strong>
+              <span>gescoord</span>
+            </div>
+            <div className="stat-tile">
+              <strong>{goals(st.goalsAgainst)}</strong>
+              <span>tegen</span>
+            </div>
+            <div className="stat-tile">
+              <strong>
+                {st.goalsFor - st.goalsAgainst > 0 ? '+' : ''}
+                {goals(st.goalsFor - st.goalsAgainst)}
+              </strong>
+              <span>doelsaldo</span>
+            </div>
+          </div>
+          {(st.biggestWin || st.heaviestLoss) && (
+            <ul className="stat-card stat-list">
+              {st.biggestWin && (
+                <li>
+                  <span>Grootste overwinning</span>
+                  <strong>{scoreLine(st.biggestWin)}</strong>
+                </li>
+              )}
+              {st.heaviestLoss && (
+                <li>
+                  <span>Zwaarste nederlaag</span>
+                  <strong>{scoreLine(st.heaviestLoss)}</strong>
+                </li>
+              )}
+            </ul>
+          )}
+
+          {st.perPeriod.length > 0 && (
+            <>
+              <h2 className="section-title">Per periode</h2>
+              <ul className="stat-card stat-list">
+                {st.perPeriod.map((p, i) => (
+                  <li key={i}>
+                    <span>Periode {i + 1}</span>
+                    <strong>
+                      <span className="is-ours">{goals(p.us)}</span> – {goals(p.them)}
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          <h2 className="section-title">Topschutters</h2>
+          {st.scorers.length === 0 ? (
+            <p className="empty">Nog geen doelpunten met een naam erbij.</p>
+          ) : (
+            <ol className="stat-card stat-rank">
+              {st.scorers.map((p, i) => (
+                <li key={p.name}>
+                  <span className="stat-rank-pos">{i + 1}</span>
+                  <span className="stat-rank-name">
+                    {p.name}
+                    <small>
+                      {p.matches} {p.matches === 1 ? 'wedstrijd' : 'wedstrijden'} gescoord
+                      {p.hattricks > 0 &&
+                        ` · ${p.hattricks} ${p.hattricks === 1 ? 'hattrick' : 'hattricks'}`}
+                    </small>
+                  </span>
+                  <span className="stat-rank-value">{p.goals}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {st.takers.length > 0 && (
+            <>
+              <h2 className="section-title">Strafschoppen</h2>
+              <div className="stat-tiles">
+                <div className="stat-tile">
+                  <strong>{shootoutCount}</strong>
+                  <span>{shootoutCount === 1 ? 'reeks' : 'reeksen'}</span>
+                </div>
+                <div className="stat-tile is-w">
+                  <strong>{st.shootouts.won}</strong>
+                  <span>gewonnen</span>
+                </div>
+                <div className="stat-tile is-g">
+                  <strong>{st.shootouts.drawn}</strong>
+                  <span>gelijk</span>
+                </div>
+                <div className="stat-tile is-v">
+                  <strong>{st.shootouts.lost}</strong>
+                  <span>verloren</span>
+                </div>
+              </div>
+              <div className="stat-sort">
+                <span className="choice-label">Sorteer op</span>
+                <div className="periods">
+                  <button
+                    className={penaltySort === 'scored' ? 'per is-on' : 'per'}
+                    onClick={() => setPenaltySort('scored')}
+                    aria-pressed={penaltySort === 'scored'}
+                  >
+                    Aantal raak
+                  </button>
+                  <button
+                    className={penaltySort === 'rate' ? 'per is-on' : 'per'}
+                    onClick={() => setPenaltySort('rate')}
+                    aria-pressed={penaltySort === 'rate'}
+                  >
+                    % raak
+                  </button>
+                </div>
+              </div>
+              <ol className="stat-card stat-rank">
+                {takers.map((p, i) => (
+                  <li key={p.name}>
+                    <span className="stat-rank-pos">{i + 1}</span>
+                    <span className="stat-rank-name">
+                      {p.name}
+                      <small>{Math.round((p.scored / p.total) * 100)}% raak</small>
+                    </span>
+                    <span className="stat-rank-value">
+                      {p.scored}
+                      <span className="stat-rank-of">/{p.total}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
 function History({ history, onView, onDelete }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null)
 
   return (
     <section className="pane-history">
-      <h2 className="section-title">Historiek</h2>
+      <h2 className="section-title">Vorige wedstrijden</h2>
       {history.length === 0 ? (
         <p className="empty">
           Nog geen afgewerkte wedstrijden. Druk na een wedstrijd op <strong>Beëindig</strong>{' '}
@@ -2058,7 +2399,7 @@ function History({ history, onView, onDelete }) {
       {confirmingDelete && (
         <Confirm
           title="Wedstrijd verwijderen?"
-          body={`De bewaarde wedstrijd tegen ${confirmingDelete.theirName} (${confirmingDelete.date}) wordt definitief verwijderd uit de Historiek.`}
+          body={`De bewaarde wedstrijd tegen ${confirmingDelete.theirName} (${confirmingDelete.date}) wordt definitief verwijderd uit Vorige wedstrijden.`}
           confirmLabel="Ja, verwijder"
           danger
           onConfirm={() => {
@@ -2235,6 +2576,20 @@ function HistoryIcon() {
       />
       <path d="M3.5 4.5v3.5H7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M12 8v4.5l3 2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function StatsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <path
+        d="M5 19.5V13M10 19.5V5M15 19.5V10M20 19.5V15"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }

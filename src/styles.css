@@ -223,7 +223,7 @@ body {
   bottom: 0;
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   width: min(100%, 34rem);
   padding: 0.35rem 0.65rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
   background: rgba(255, 255, 255, 0.96);
@@ -246,6 +246,8 @@ body {
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
   color: var(--muted);
   cursor: pointer;
 }
@@ -1660,9 +1662,9 @@ input:focus-visible {
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
-.btn-start-hero svg {
-  width: 20px;
-  height: 20px;
+.home-hero-ball {
+  margin-right: 0.4rem;
+  font-size: 1.5rem;
 }
 
 .btn-start-hero:active {
@@ -1721,7 +1723,8 @@ input:focus-visible {
   .tabs,
   .foot,
   .pane-squad,
-  .pane-history {
+  .pane-history,
+  .pane-stats {
     grid-column: 1 / -1;
   }
 
@@ -1849,4 +1852,208 @@ input:focus-visible {
   margin-bottom: 1rem;
   border-radius: var(--radius);
   background: var(--ink);
+}
+
+/* Statistieken */
+.stats-empty {
+  margin-top: 1rem;
+}
+
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  padding: 0 1rem;
+}
+
+.stat-tiles-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 0.7rem 0.3rem 0.6rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.stat-tile strong {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stat-tile > span {
+  margin-top: 0.1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.stat-tile.is-w {
+  box-shadow: inset 0 4px 0 var(--success), var(--shadow);
+}
+
+.stat-tile.is-g {
+  box-shadow: inset 0 4px 0 var(--away), var(--shadow);
+}
+
+.stat-tile.is-v {
+  box-shadow: inset 0 4px 0 var(--danger), var(--shadow);
+}
+
+.stat-tile .is-ours,
+.stat-list .is-ours {
+  color: var(--club);
+}
+
+.stat-card {
+  margin: 0.5rem 1rem 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.stat-form {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.85rem;
+}
+
+.stat-card-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.form-dots {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.form-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--away);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--paper);
+}
+
+.form-dot.is-w {
+  background: var(--success);
+}
+
+.form-dot.is-v {
+  background: var(--danger);
+}
+
+.stat-note {
+  margin: 0.35rem 1rem 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+
+.stat-list,
+.stat-rank {
+  padding: 0;
+  list-style: none;
+}
+
+.stat-list li,
+.stat-rank li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+}
+
+.stat-list li + li,
+.stat-rank li + li {
+  border-top: 1px solid var(--line-soft);
+}
+
+.stat-list li > span {
+  flex: 1;
+  color: var(--muted);
+}
+
+.stat-list strong {
+  font-weight: 600;
+  text-align: right;
+}
+
+.stat-rank-pos {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--line-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.stat-rank li:first-child .stat-rank-pos {
+  background: var(--club);
+  color: var(--paper);
+}
+
+.stat-rank-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.stat-rank-name small {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.stat-rank-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--club);
+}
+
+.stat-rank-of {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.stat-sort {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.6rem 1rem 0;
+}
+
+.stat-sort .per {
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
+}
+
+.stat-sort-top {
+  margin-top: 0;
+  margin-bottom: 0.6rem;
 }
