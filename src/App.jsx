@@ -2240,9 +2240,25 @@ const AUTO_BACKUP_KEY = 'scorebord-auto-backup'
 const longDate = (d) =>
   new Date(d).toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' })
 
-// Bewaart de gegevens als bestand: op een gsm via het deelvenster (bewaren in
-// Bestanden, Drive, WhatsApp…), op een computer gewoon downloaden. Geeft
-// false als het deelvenster weggeklikt werd; gooit een fout als het mislukt.
+// iPhone/iPad (ook een iPad die zich als Mac voordoet). Daar werkt
+// downloaden vanuit de app slecht, dus gaat de back-up via het deelvenster.
+const isIOS = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+function download(file) {
+  const url = URL.createObjectURL(file)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = file.name
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// Bewaart de gegevens als bestand: op iOS via het deelvenster (bewaren in
+// Bestanden, Drive…), elders (Android, computer) gewoon downloaden. Android
+// laat het delen van .json-bestanden niet toe. Geeft false als het
+// deelvenster weggeklikt werd.
 async function saveBackup(state) {
   const now = new Date().toISOString()
   const json = JSON.stringify(
@@ -2253,21 +2269,16 @@ async function saveBackup(state) {
   // Lokale datum (JJJJ-MM-DD) in de naam, niet die van UTC.
   const name = `scorebord-backup-${new Date().toLocaleDateString('sv-SE')}.json`
   const file = new File([json], name, { type: 'application/json' })
-  const touch = window.matchMedia?.('(pointer: coarse)').matches
-  if (touch && navigator.canShare?.({ files: [file] })) {
+  if (isIOS() && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: 'Scorebord back-up' })
     } catch (e) {
       if (e?.name === 'AbortError') return false
-      throw e
+      // Delen geweigerd (bv. bestandstype niet toegelaten): dan toch downloaden.
+      download(file)
     }
   } else {
-    const url = URL.createObjectURL(file)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = name
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    download(file)
   }
   try {
     localStorage.setItem(BACKUP_KEY, now)
