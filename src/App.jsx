@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { drawSummary, loadClubLogo, heightFor, W as SHOT_W } from './summary.js'
 import { version as APP_VERSION } from '../package.json'
 
@@ -883,7 +884,7 @@ export default function App() {
           onClick={() => setScreen('history')}
           aria-current={screen === 'history' ? 'page' : undefined}
         >
-          <ResultsIcon />
+          <HistoryIcon />
           <span>Uitslagen</span>
         </button>
         <button
@@ -935,7 +936,7 @@ export default function App() {
                     aria-label={clockLabel}
                     title={clockLabel}
                   >
-                    {running ? <PauseIcon /> : <PlayIcon />}
+                    {running ? <PauseIcon key="pause" /> : <PlayIcon key="play" />}
                     <span>{clockLabel}</span>
                   </button>
                   {match.period < PERIODS.length && !periodOver && (
@@ -972,32 +973,33 @@ export default function App() {
                     </button>
                   )}
                 </div>
-                {subPhase === 'soon' && !subDismissed && (
-                  <div className="sub-alert">
-                    <span>Wisselen over</span>
-                    <strong>{nextSub - clock}s</strong>
-                  </div>
-                )}
-                {subPhase === 'now' && !subDismissed && (
-                  <div className="sub-alert is-now" role="status">
-                    <SwapIcon />
-                    <strong>Wisselen!</strong>
-                    <span>
-                      {subHalfway
-                        ? `Halverwege periode ${match.period}`
-                        : `${mmss(lastSub)} in periode ${match.period}`}
-                    </span>
-                    <button
-                      className="btn btn-icon btn-undo sub-dismiss"
-                      onClick={() => setDismissedSub(subKey)}
-                      aria-label="Verberg wisselmelding"
-                      title="Verberg wisselmelding"
-                    >
-                      ✓
-                    </button>
-                  </div>
-                )}
-                {periodOver && (
+                <Presence show={(subPhase === 'soon' || subPhase === 'now') && !subDismissed}>
+                  {subPhase === 'now' ? (
+                    <div className="sub-alert is-now" role="status">
+                      <SwapIcon />
+                      <strong>Wisselen!</strong>
+                      <span>
+                        {subHalfway
+                          ? `Halverwege periode ${match.period}`
+                          : `${mmss(lastSub)} in periode ${match.period}`}
+                      </span>
+                      <button
+                        className="btn btn-icon btn-undo sub-dismiss"
+                        onClick={() => setDismissedSub(subKey)}
+                        aria-label="Verberg wisselmelding"
+                        title="Verberg wisselmelding"
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="sub-alert">
+                      <span>Wisselen over</span>
+                      <strong>{nextSub - clock}s</strong>
+                    </div>
+                  )}
+                </Presence>
+                <Presence show={periodOver}>
                   <div
                     className={
                       lastPeriod ? 'period-change period-over is-final' : 'period-change period-over'
@@ -1042,14 +1044,14 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                )}
-                {!running && !periodOver && (goalWhilePaused || clock === 0) && (
+                </Presence>
+                <Presence show={!running && !periodOver && (goalWhilePaused || clock === 0)}>
                   <p className={goalWhilePaused ? 'clock-hint is-warning' : 'clock-hint'}>
                     {goalWhilePaused
                       ? 'De klok loopt niet — tik ▶ om te starten.'
                       : 'Tik ▶ bij de aftrap om de klok te starten.'}
                   </p>
-                )}
+                </Presence>
               </section>
             )}
 
@@ -1086,7 +1088,11 @@ export default function App() {
                         {'•'.repeat(Math.min(runs.hattricks[p.id], 3))}
                       </span>
                     )}
-                    {goalsBy[p.id] > 0 && <span className="tally">{goalsBy[p.id]}</span>}
+                    {goalsBy[p.id] > 0 && (
+                      <span key={goalsBy[p.id]} className="tally">
+                        {goalsBy[p.id]}
+                      </span>
+                    )}
                   </button>
                 )
               })}
@@ -1194,6 +1200,7 @@ export default function App() {
         />
       ) : screen === 'history' ? (
         <History
+          teams={state.teams}
           history={state.history}
           onView={setViewingHistory}
           onDelete={deleteHistoryEntry}
@@ -1279,6 +1286,8 @@ export default function App() {
 }
 
 function Summary({ data, onClose }) {
+  const panel = useRef(null)
+  const { cancel: close, overlayClass } = useDialog(panel, onClose)
   const [url, setUrl] = useState(null)
   const [file, setFile] = useState(null)
   const [failed, setFailed] = useState(false)
@@ -1314,12 +1323,6 @@ function Summary({ data, onClose }) {
     }
   }, [data])
 
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   useEffect(() => () => url && URL.revokeObjectURL(url), [url])
 
   const canShare = file && navigator.canShare?.({ files: [file] })
@@ -1339,13 +1342,17 @@ function Summary({ data, onClose }) {
     link.click()
   }
 
-  return (
-    <div className="overlay" onClick={onClose}>
+  // Rechtstreeks in <body>, zodat een geanimeerde ouder (transform) het
+  // venster niet kan insluiten of onder de tabbalk kan duwen.
+  return createPortal(
+    <div className={overlayClass} onClick={close}>
       <div
         className="dialog dialog-wide"
         role="dialog"
         aria-modal="true"
         aria-label="Samenvatting van de match"
+        tabIndex={-1}
+        ref={panel}
         onClick={(e) => e.stopPropagation()}
       >
         {failed ? (
@@ -1357,7 +1364,7 @@ function Summary({ data, onClose }) {
         )}
 
         <div className="dialog-actions">
-          <button className="btn" onClick={onClose}>
+          <button className="btn" onClick={close}>
             Sluit
           </button>
           {url && !canShare && (
@@ -1372,12 +1379,40 @@ function Summary({ data, onClose }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
 // Gedrag van een venster: focus erin bij openen, Escape sluit, Tab blijft
 // binnen het venster, en de pagina erachter scrolt niet mee.
+const LEAVE_MS = 150
+
+// Houdt een melding nog even in beeld nadat ze verdwijnt, zodat ze kan
+// uitvagen in plaats van weg te springen. Toont tijdens het uitvagen de
+// laatst zichtbare inhoud.
+function Presence({ show, children }) {
+  const [mounted, setMounted] = useState(show)
+  const last = useRef(children)
+  if (show) last.current = children
+
+  useEffect(() => {
+    if (show) {
+      setMounted(true)
+      return
+    }
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setMounted(false)
+      return
+    }
+    const t = setTimeout(() => setMounted(false), LEAVE_MS)
+    return () => clearTimeout(t)
+  }, [show])
+
+  if (!show && !mounted) return null
+  return <div className={show ? 'presence' : 'presence is-leaving'}>{last.current}</div>
+}
+
 function useModal(panel, onClose) {
   useEffect(() => {
     panel.current?.focus()
@@ -1409,13 +1444,41 @@ function useModal(panel, onClose) {
   }, [panel, onClose])
 }
 
+
+// Laat een venster eerst uitvagen voor het echt sluit: de ouder haalt het pas
+// weg (via onCancel of de gekozen actie) nadat de animatie gelopen heeft.
+// Met "Beperk beweging" sluit het meteen.
+function useDialog(panel, onCancel) {
+  const [leaving, setLeaving] = useState(false)
+  const busy = useRef(false)
+  const latestCancel = useRef(onCancel)
+  latestCancel.current = onCancel
+
+  const leave = useCallback((action) => {
+    if (busy.current) return
+    busy.current = true
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      action()
+      return
+    }
+    setLeaving(true)
+    setTimeout(action, LEAVE_MS)
+  }, [])
+  // Stabiel, zodat useModal niet bij elke render opnieuw de focus pakt.
+  const cancel = useCallback(() => leave(() => latestCancel.current()), [leave])
+
+  useModal(panel, cancel)
+  return { leaving, leave, cancel, overlayClass: leaving ? 'overlay is-leaving' : 'overlay' }
+}
+
 function Confirm({ title, body, confirmLabel, cancelLabel = 'Nee', danger, onConfirm, onCancel }) {
   const panel = useRef(null)
+  const { leave, cancel, overlayClass } = useDialog(panel, onCancel)
 
-  useModal(panel, onCancel)
-
-  return (
-    <div className="overlay" onClick={onCancel}>
+  // Rechtstreeks in <body>, zodat een geanimeerde ouder (transform) het
+  // venster niet kan insluiten of onder de tabbalk kan duwen.
+  return createPortal(
+    <div className={overlayClass} onClick={cancel}>
       <div
         className="dialog"
         role="dialog"
@@ -1428,18 +1491,19 @@ function Confirm({ title, body, confirmLabel, cancelLabel = 'Nee', danger, onCon
         <h2 id="dialog-title">{title}</h2>
         <p>{body}</p>
         <div className="dialog-actions">
-          <button className="btn" onClick={onCancel}>
+          <button className="btn" onClick={cancel}>
             {cancelLabel}
           </button>
           <button
             className={danger ? 'btn btn-danger' : 'btn btn-primary'}
-            onClick={onConfirm}
+            onClick={() => leave(onConfirm)}
           >
             {confirmLabel}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -1670,10 +1734,12 @@ function LastAction({ match, score, opponentName, onUndo }) {
 // Venster na een tik op een nemer: was de strafschop raak of niet?
 function PenaltyResult({ name, onPick, onCancel }) {
   const panel = useRef(null)
-  useModal(panel, onCancel)
+  const { leave, cancel, overlayClass } = useDialog(panel, onCancel)
 
-  return (
-    <div className="overlay" onClick={onCancel}>
+  // Rechtstreeks in <body>, zodat een geanimeerde ouder (transform) het
+  // venster niet kan insluiten of onder de tabbalk kan duwen.
+  return createPortal(
+    <div className={overlayClass} onClick={cancel}>
       <div
         className="dialog"
         role="dialog"
@@ -1685,11 +1751,11 @@ function PenaltyResult({ name, onPick, onCancel }) {
       >
         <h2 id="penalty-result-title">Strafschop {name}</h2>
         <div className="penalty-choice">
-          <button className="btn penalty-choice-yes" onClick={() => onPick(true)}>
+          <button className="btn penalty-choice-yes" onClick={() => leave(() => onPick(true))}>
             <BallScoredIcon />
             Doelpunt
           </button>
-          <button className="btn penalty-choice-no" onClick={() => onPick(false)}>
+          <button className="btn penalty-choice-no" onClick={() => leave(() => onPick(false))}>
             <span className="penalty-choice-x" aria-hidden="true">
               ✗
             </span>
@@ -1697,12 +1763,13 @@ function PenaltyResult({ name, onPick, onCancel }) {
           </button>
         </div>
         <div className="dialog-actions">
-          <button className="btn" onClick={onCancel}>
+          <button className="btn" onClick={cancel}>
             Annuleer
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -1777,7 +1844,7 @@ function Penalties({ onEnd, open, penalties, players, opponentName, onAdd, onRem
               <div key={col.team} className={col.team === 'us' ? 'penalty-col is-ours' : 'penalty-col'}>
                 <div className="penalty-col-head">
                   <span className="penalty-col-name">{col.label}</span>
-                  <strong>
+                  <strong key={`${col.scored}/${col.total}`}>
                     {col.scored}/{col.total}
                   </strong>
                 </div>
@@ -2188,240 +2255,279 @@ function Stats({ teams, history, defaultTeamId }) {
         ))}
       </div>
 
-      {n === 0 ? (
-        <p className="empty stats-empty">
-          Nog geen afgewerkte wedstrijden voor de {team.ageGroup}. Na een wedstrijd verschijnen hier
-          de cijfers.
-        </p>
-      ) : (
-        <>
-          <h2 className="section-title">Resultaten</h2>
-          <div className="stat-tiles">
-            <div className="stat-tile">
-              <strong>{n}</strong>
-              <span>{n === 1 ? 'wedstrijd' : 'wedstrijden'}</span>
+      {/* Bij een andere ploeg komt alles opnieuw binnen. */}
+      <div key={team.id}>
+        {n === 0 ? (
+          <p className="empty stats-empty">
+            Nog geen afgewerkte wedstrijden voor de {team.ageGroup}. Na een wedstrijd verschijnen hier
+            de cijfers.
+          </p>
+        ) : (
+          <>
+            <h2 className="section-title">Resultaten</h2>
+            <div className="stat-tiles">
+              <div className="stat-tile">
+                <strong>{n}</strong>
+                <span>{n === 1 ? 'wedstrijd' : 'wedstrijden'}</span>
+              </div>
+              <div className="stat-tile is-w">
+                <strong>{st.record.W}</strong>
+                <span>gewonnen</span>
+              </div>
+              <div className="stat-tile is-g">
+                <strong>{st.record.G}</strong>
+                <span>gelijk</span>
+              </div>
+              <div className="stat-tile is-v">
+                <strong>{st.record.V}</strong>
+                <span>verloren</span>
+              </div>
             </div>
-            <div className="stat-tile is-w">
-              <strong>{st.record.W}</strong>
-              <span>gewonnen</span>
-            </div>
-            <div className="stat-tile is-g">
-              <strong>{st.record.G}</strong>
-              <span>gelijk</span>
-            </div>
-            <div className="stat-tile is-v">
-              <strong>{st.record.V}</strong>
-              <span>verloren</span>
-            </div>
-          </div>
 
-          <div className="stat-card stat-form">
-            <span className="stat-card-label">Vorm</span>
-            <span className="form-dots">
-              {st.form.map((r, i) => (
-                <span key={i} className={`form-dot is-${r.toLowerCase()}`} title={RESULT_LABELS[r]}>
-                  {r}
-                </span>
-              ))}
-            </span>
-          </div>
-          <p className="stat-note">Laatste {st.form.length} wedstrijden, meest recente rechts.</p>
-
-          <h2 className="section-title">Doelpunten</h2>
-          <div className="stat-sort stat-sort-top">
-            <span className="choice-label">Toon</span>
-            <div className="periods">
-              <button
-                className={goalsView === 'total' ? 'per is-on' : 'per'}
-                onClick={() => setGoalsView('total')}
-                aria-pressed={goalsView === 'total'}
-              >
-                Totaal
-              </button>
-              <button
-                className={goalsView === 'avg' ? 'per is-on' : 'per'}
-                onClick={() => setGoalsView('avg')}
-                aria-pressed={goalsView === 'avg'}
-              >
-                Per wedstrijd
-              </button>
-            </div>
-          </div>
-          <div className="stat-tiles stat-tiles-3">
-            <div className="stat-tile">
-              <strong className="is-ours">{goals(st.goalsFor)}</strong>
-              <span>gescoord</span>
-            </div>
-            <div className="stat-tile">
-              <strong>{goals(st.goalsAgainst)}</strong>
-              <span>tegen</span>
-            </div>
-            <div className="stat-tile">
-              <strong>
-                {st.goalsFor - st.goalsAgainst > 0 ? '+' : ''}
-                {goals(st.goalsFor - st.goalsAgainst)}
-              </strong>
-              <span>doelsaldo</span>
-            </div>
-          </div>
-          {(st.biggestWin || st.heaviestLoss) && (
-            <ul className="stat-card stat-list">
-              {st.biggestWin && (
-                <li>
-                  <span>Grootste overwinning</span>
-                  <strong>{scoreLine(st.biggestWin)}</strong>
-                </li>
-              )}
-              {st.heaviestLoss && (
-                <li>
-                  <span>Zwaarste nederlaag</span>
-                  <strong>{scoreLine(st.heaviestLoss)}</strong>
-                </li>
-              )}
-            </ul>
-          )}
-
-          {st.perPeriod.length > 0 && (
-            <>
-              <h2 className="section-title">Per periode</h2>
-              <ul className="stat-card stat-list">
-                {st.perPeriod.map((p, i) => (
-                  <li key={i}>
-                    <span>Periode {i + 1}</span>
-                    <strong>
-                      <span className="is-ours">{goals(p.us)}</span> – {goals(p.them)}
-                    </strong>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          <h2 className="section-title">Topschutters</h2>
-          {st.scorers.length === 0 ? (
-            <p className="empty">Nog geen doelpunten met een naam erbij.</p>
-          ) : (
-            <ol className="stat-card stat-rank">
-              {st.scorers.map((p, i) => (
-                <li key={p.name}>
-                  <span className="stat-rank-pos">{i + 1}</span>
-                  <span className="stat-rank-name">
-                    {p.name}
-                    <small>
-                      {p.matches} {p.matches === 1 ? 'wedstrijd' : 'wedstrijden'} gescoord
-                      {p.hattricks > 0 &&
-                        ` · ${p.hattricks} ${p.hattricks === 1 ? 'hattrick' : 'hattricks'}`}
-                    </small>
+            <div className="stat-card stat-form">
+              <span className="stat-card-label">Vorm</span>
+              <span className="form-dots">
+                {st.form.map((r, i) => (
+                  <span key={i} className={`form-dot is-${r.toLowerCase()}`} title={RESULT_LABELS[r]}>
+                    {r}
                   </span>
-                  <span className="stat-rank-value">{p.goals}</span>
-                </li>
-              ))}
-            </ol>
-          )}
+                ))}
+              </span>
+            </div>
+            <p className="stat-note">Laatste {st.form.length} wedstrijden, meest recente rechts.</p>
 
-          {st.takers.length > 0 && (
-            <>
-              <h2 className="section-title">Strafschoppen</h2>
-              <div className="stat-tiles">
-                <div className="stat-tile">
-                  <strong>{shootoutCount}</strong>
-                  <span>{shootoutCount === 1 ? 'reeks' : 'reeksen'}</span>
-                </div>
-                <div className="stat-tile is-w">
-                  <strong>{st.shootouts.won}</strong>
-                  <span>gewonnen</span>
-                </div>
-                <div className="stat-tile is-g">
-                  <strong>{st.shootouts.drawn}</strong>
-                  <span>gelijk</span>
-                </div>
-                <div className="stat-tile is-v">
-                  <strong>{st.shootouts.lost}</strong>
-                  <span>verloren</span>
-                </div>
+            <h2 className="section-title">Doelpunten</h2>
+            <div className="stat-sort stat-sort-top">
+              <span className="choice-label">Toon</span>
+              <div className="periods">
+                <button
+                  className={goalsView === 'total' ? 'per is-on' : 'per'}
+                  onClick={() => setGoalsView('total')}
+                  aria-pressed={goalsView === 'total'}
+                >
+                  Totaal
+                </button>
+                <button
+                  className={goalsView === 'avg' ? 'per is-on' : 'per'}
+                  onClick={() => setGoalsView('avg')}
+                  aria-pressed={goalsView === 'avg'}
+                >
+                  Per wedstrijd
+                </button>
               </div>
-              <div className="stat-sort">
-                <span className="choice-label">Sorteer op</span>
-                <div className="periods">
-                  <button
-                    className={penaltySort === 'scored' ? 'per is-on' : 'per'}
-                    onClick={() => setPenaltySort('scored')}
-                    aria-pressed={penaltySort === 'scored'}
-                  >
-                    Aantal raak
-                  </button>
-                  <button
-                    className={penaltySort === 'rate' ? 'per is-on' : 'per'}
-                    onClick={() => setPenaltySort('rate')}
-                    aria-pressed={penaltySort === 'rate'}
-                  >
-                    % raak
-                  </button>
-                </div>
+            </div>
+            <div key={goalsView} className="stat-tiles stat-tiles-3">
+              <div className="stat-tile">
+                <strong className="is-ours">{goals(st.goalsFor)}</strong>
+                <span>gescoord</span>
               </div>
+              <div className="stat-tile">
+                <strong>{goals(st.goalsAgainst)}</strong>
+                <span>tegen</span>
+              </div>
+              <div className="stat-tile">
+                <strong>
+                  {st.goalsFor - st.goalsAgainst > 0 ? '+' : ''}
+                  {goals(st.goalsFor - st.goalsAgainst)}
+                </strong>
+                <span>doelsaldo</span>
+              </div>
+            </div>
+            {(st.biggestWin || st.heaviestLoss) && (
+              <ul className="stat-card stat-list">
+                {st.biggestWin && (
+                  <li>
+                    <span>Grootste overwinning</span>
+                    <strong>{scoreLine(st.biggestWin)}</strong>
+                  </li>
+                )}
+                {st.heaviestLoss && (
+                  <li>
+                    <span>Zwaarste nederlaag</span>
+                    <strong>{scoreLine(st.heaviestLoss)}</strong>
+                  </li>
+                )}
+              </ul>
+            )}
+
+            {st.perPeriod.length > 0 && (
+              <>
+                <h2 className="section-title">Per periode</h2>
+                <ul key={goalsView} className="stat-card stat-list">
+                  {st.perPeriod.map((p, i) => (
+                    <li key={i}>
+                      <span>Periode {i + 1}</span>
+                      <strong>
+                        <span className="is-ours">{goals(p.us)}</span> – {goals(p.them)}
+                      </strong>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            <h2 className="section-title">Topschutters</h2>
+            {st.scorers.length === 0 ? (
+              <p className="empty">Nog geen doelpunten met een naam erbij.</p>
+            ) : (
               <ol className="stat-card stat-rank">
-                {takers.map((p, i) => (
+                {st.scorers.map((p, i) => (
                   <li key={p.name}>
                     <span className="stat-rank-pos">{i + 1}</span>
                     <span className="stat-rank-name">
                       {p.name}
-                      <small>{Math.round((p.scored / p.total) * 100)}% raak</small>
+                      <small>
+                        {p.matches} {p.matches === 1 ? 'wedstrijd' : 'wedstrijden'} gescoord
+                        {p.hattricks > 0 &&
+                          ` · ${p.hattricks} ${p.hattricks === 1 ? 'hattrick' : 'hattricks'}`}
+                      </small>
                     </span>
-                    <span className="stat-rank-value">
-                      {p.scored}
-                      <span className="stat-rank-of">/{p.total}</span>
-                    </span>
+                    <span className="stat-rank-value">{p.goals}</span>
                   </li>
                 ))}
               </ol>
-            </>
-          )}
-        </>
-      )}
+            )}
+
+            {st.takers.length > 0 && (
+              <>
+                <h2 className="section-title">Strafschoppen</h2>
+                <div className="stat-tiles">
+                  <div className="stat-tile">
+                    <strong>{shootoutCount}</strong>
+                    <span>{shootoutCount === 1 ? 'reeks' : 'reeksen'}</span>
+                  </div>
+                  <div className="stat-tile is-w">
+                    <strong>{st.shootouts.won}</strong>
+                    <span>gewonnen</span>
+                  </div>
+                  <div className="stat-tile is-g">
+                    <strong>{st.shootouts.drawn}</strong>
+                    <span>gelijk</span>
+                  </div>
+                  <div className="stat-tile is-v">
+                    <strong>{st.shootouts.lost}</strong>
+                    <span>verloren</span>
+                  </div>
+                </div>
+                <div className="stat-sort">
+                  <span className="choice-label">Sorteer op</span>
+                  <div className="periods">
+                    <button
+                      className={penaltySort === 'scored' ? 'per is-on' : 'per'}
+                      onClick={() => setPenaltySort('scored')}
+                      aria-pressed={penaltySort === 'scored'}
+                    >
+                      Aantal raak
+                    </button>
+                    <button
+                      className={penaltySort === 'rate' ? 'per is-on' : 'per'}
+                      onClick={() => setPenaltySort('rate')}
+                      aria-pressed={penaltySort === 'rate'}
+                    >
+                      % raak
+                    </button>
+                  </div>
+                </div>
+                <ol key={penaltySort} className="stat-card stat-rank">
+                  {takers.map((p, i) => (
+                    <li key={p.name}>
+                      <span className="stat-rank-pos">{i + 1}</span>
+                      <span className="stat-rank-name">
+                        {p.name}
+                        <small>{Math.round((p.scored / p.total) * 100)}% raak</small>
+                      </span>
+                      <span className="stat-rank-value">
+                        {p.scored}
+                        <span className="stat-rank-of">/{p.total}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </section>
   )
 }
 
-function History({ history, onView, onDelete }) {
+function History({ teams, history, onView, onDelete }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null)
+  const [teamId, setTeamId] = useState(null)
+  const team = teams.find((t) => t.id === teamId)
+  const shown = team ? playedBy(team, history) : history
 
   return (
     <section className="pane-history">
       <h2 className="section-title">Vorige wedstrijden</h2>
+      {teams.length > 1 && history.length > 0 && (
+        <div className="team-switch">
+          <button
+            className={team ? 'team-chip' : 'team-chip is-on'}
+            onClick={() => setTeamId(null)}
+            aria-pressed={!team}
+          >
+            Alle
+          </button>
+          {teams.map((t) => (
+            <button
+              key={t.id}
+              className={t.id === team?.id ? 'team-chip is-on' : 'team-chip'}
+              onClick={() => setTeamId(t.id)}
+              aria-pressed={t.id === team?.id}
+            >
+              {t.ageGroup}
+            </button>
+          ))}
+        </div>
+      )}
       {history.length === 0 ? (
         <p className="empty">
           Nog geen afgewerkte wedstrijden. Druk na een wedstrijd op <strong>Beëindig</strong>{' '}
           om ze hier te bewaren.
         </p>
       ) : (
-        <ul className="history-list">
-          {history.map((h) => (
-            <li key={h.id}>
-              <button className="history-item" onClick={() => onView(h)}>
-                <span className="history-item-score">
-                  <span className={h.left.ours ? 'is-ours' : ''}>{h.left.goals}</span>
-                  <span className="history-item-dash">–</span>
-                  <span className={h.right.ours ? 'is-ours' : ''}>{h.right.goals}</span>
-                </span>
-                <span className="history-item-info">
-                  <span className="history-item-opponent">{h.theirName}</span>
-                  <span className="history-item-meta">
-                    <span className="age-chip">{h.ageGroup}</span>
-                    {h.date}
+        shown.length === 0 ? (
+          <p className="empty history-empty">
+            Nog geen afgewerkte wedstrijden voor de {team.ageGroup}.
+          </p>
+        ) : (
+          <ul key={team?.id ?? 'all'} className="history-list">
+            {shown.map((h) => (
+              <li key={h.id}>
+                <button className="history-item" onClick={() => onView(h)}>
+                  <span
+                    className={`form-dot is-${resultOf(h).toLowerCase()}`}
+                    title={RESULT_LABELS[resultOf(h)]}
+                  >
+                    {resultOf(h)}
                   </span>
-                </span>
-              </button>
-              <button
-                className="btn btn-quiet btn-icon"
-                onClick={() => setConfirmingDelete(h)}
-                aria-label={`Verwijder wedstrijd tegen ${h.theirName}`}
-                title="Verwijder"
-              >
-                <TrashIcon />
-              </button>
-            </li>
-          ))}
-        </ul>
+                  <span className="history-item-score">
+                    <span className={h.left.ours ? 'is-ours' : ''}>{h.left.goals}</span>
+                    <span className="history-item-dash">–</span>
+                    <span className={h.right.ours ? 'is-ours' : ''}>{h.right.goals}</span>
+                  </span>
+                  <span className="history-item-info">
+                    <span className="history-item-opponent">{h.theirName}</span>
+                    <span className="history-item-meta">
+                      <span className="age-chip">{h.ageGroup}</span>
+                      {h.date}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  className="btn btn-quiet btn-icon"
+                  onClick={() => setConfirmingDelete(h)}
+                  aria-label={`Verwijder wedstrijd tegen ${h.theirName}`}
+                  title="Verwijder"
+                >
+                  <TrashIcon />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
       )}
 
       {confirmingDelete && (
@@ -2592,16 +2698,18 @@ function TeamIcon() {
   )
 }
 
-// Klein scorebord: twee cijfervakjes met een scheiding ertussen.
-function ResultsIcon() {
+function HistoryIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-      <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="5" width="18" height="14" rx="2.5" />
-        <path d="M12 8.5v7" />
-        <rect x="6" y="9" width="3" height="6" rx="1" />
-        <rect x="15" y="9" width="3" height="6" rx="1" />
-      </g>
+      <path
+        d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path d="M3.5 4.5v3.5H7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 8v4.5l3 2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -2707,10 +2815,12 @@ function SubChoice({ subMinutes, periodMinutes, onChange }) {
 function SubSettings({ subMinutes, periodMinutes, onSave, onCancel }) {
   const panel = useRef(null)
   const [value, setValue] = useState(subMinutes)
-  useModal(panel, onCancel)
+  const { leave, cancel, overlayClass } = useDialog(panel, onCancel)
 
-  return (
-    <div className="overlay" onClick={onCancel}>
+  // Rechtstreeks in <body>, zodat een geanimeerde ouder (transform) het
+  // venster niet kan insluiten of onder de tabbalk kan duwen.
+  return createPortal(
+    <div className={overlayClass} onClick={cancel}>
       <div
         className="dialog"
         role="dialog"
@@ -2723,15 +2833,16 @@ function SubSettings({ subMinutes, periodMinutes, onSave, onCancel }) {
         <h2 id="sub-settings-title">Wisselmelding</h2>
         <SubChoice subMinutes={value} periodMinutes={periodMinutes} onChange={setValue} />
         <div className="dialog-actions">
-          <button className="btn" onClick={onCancel}>
+          <button className="btn" onClick={cancel}>
             Annuleer
           </button>
-          <button className="btn btn-primary" onClick={() => onSave(value)}>
+          <button className="btn btn-primary" onClick={() => leave(() => onSave(value))}>
             Bewaar
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -2775,20 +2886,24 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
   const hasProgress = team.events.length > 0 || team.clocks.some((c) => c > 0)
 
   const start = () =>
-    onStart({
-      teamId,
-      opponent: opponent.trim(),
-      home,
-      periodsCount,
-      periodMinutes,
-      subMinutes,
-      activePlayerIds,
-    })
+    leave(() =>
+      onStart({
+        teamId,
+        opponent: opponent.trim(),
+        home,
+        periodsCount,
+        periodMinutes,
+        subMinutes,
+        activePlayerIds,
+      }),
+    )
 
-  useModal(panel, onCancel)
+  const { leave, cancel, overlayClass } = useDialog(panel, onCancel)
 
-  return (
-    <div className="overlay" onClick={onCancel}>
+  // Rechtstreeks in <body>, zodat een geanimeerde ouder (transform) het
+  // venster niet kan insluiten of onder de tabbalk kan duwen.
+  return createPortal(
+    <div className={overlayClass} onClick={cancel}>
       <div
         className="dialog dialog-wide"
         role="dialog"
@@ -2927,7 +3042,7 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
         )}
 
         <div className="dialog-actions">
-          <button className="btn" onClick={onCancel}>
+          <button className="btn" onClick={cancel}>
             Annuleer
           </button>
           <button className="btn btn-primary" onClick={start}>
@@ -2935,6 +3050,7 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -1984,6 +1984,7 @@ input:focus-visible {
 
 .form-dot {
   display: inline-grid;
+  flex: 0 0 auto;
   place-items: center;
   width: 1.75rem;
   height: 1.75rem;
@@ -2148,7 +2149,7 @@ input:focus-visible {
 
 /* Startscherm: de inhoud schuift trapsgewijs binnen, daarna ademt de knop. */
 .home-hero > :not(.pitch) {
-  animation: fade-up 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: fade-up 420ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
 }
 
 .home-hero > :nth-child(3) {
@@ -2184,7 +2185,7 @@ input:focus-visible {
 .pane-squad,
 .pane-history,
 .pane-stats {
-  animation: fade-up 260ms ease-out both;
+  animation: fade-up 260ms ease-out backwards;
 }
 
 /* Kaarten en lijsten verschijnen kort na elkaar. */
@@ -2192,7 +2193,7 @@ input:focus-visible {
 .stat-card,
 .history-list li,
 .squad li {
-  animation: fade-up 320ms ease-out both;
+  animation: fade-up 320ms ease-out backwards;
 }
 
 .stat-tile:nth-child(2),
@@ -2219,7 +2220,7 @@ input:focus-visible {
 }
 
 .form-dot {
-  animation: pop 360ms ease-out both;
+  animation: pop 360ms ease-out backwards;
 }
 
 .form-dot:nth-child(2) {
@@ -2254,15 +2255,15 @@ input:focus-visible {
 }
 
 .tl-row {
-  animation: slide-in 260ms ease-out both;
+  animation: slide-in 260ms ease-out backwards;
 }
 
 .last-action {
-  animation: fade-up 260ms ease-out both;
+  animation: fade-up 260ms ease-out backwards;
 }
 
 .last-action-check {
-  animation: pop 380ms ease-out 80ms both;
+  animation: pop 380ms ease-out 80ms backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2281,5 +2282,156 @@ input:focus-visible {
   .last-action,
   .last-action-check {
     animation: none;
+  }
+}
+
+/* Vensters vagen ook uit bij het sluiten (zie useDialog). */
+.overlay.is-leaving {
+  pointer-events: none;
+  animation: overlay-out 150ms ease-in forwards;
+}
+
+.overlay.is-leaving .dialog {
+  animation: dialog-out 150ms ease-in forwards;
+}
+
+@keyframes overlay-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+/* Meldingen tijdens de wedstrijd schuiven binnen. */
+.sub-alert,
+.period-change {
+  animation: fade-up 260ms ease-out backwards;
+}
+
+.sub-alert.is-now {
+  animation:
+    fade-up 260ms ease-out backwards,
+    sub-pulse 900ms ease-in-out 260ms infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sub-alert,
+  .period-change,
+  .sub-alert.is-now {
+    animation: none;
+  }
+}
+
+.history-empty {
+  margin-top: 1rem;
+}
+
+/* Overgangen: knoppen en keuzes kleuren zacht om. :where houdt de
+   specificiteit op nul, zodat eigen transitions (bv. .scorer) voorgaan. */
+:where(.btn, .team-chip, .per, .tab) {
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.presence.is-leaving {
+  pointer-events: none;
+  animation: fade-out 150ms ease-in forwards;
+}
+
+/* Live: het scherm bouwt zich op bij het openen. "backwards" zodat de
+   indrukschaal van :active op de knoppen blijft werken. */
+.clockbar,
+.timeline,
+.empty,
+.clock-hint,
+.penalties-end {
+  animation: fade-up 280ms ease-out backwards;
+}
+
+.grid .scorer {
+  animation: fade-up 300ms ease-out backwards;
+}
+
+.grid .scorer:nth-child(2) {
+  animation-delay: 30ms;
+}
+
+.grid .scorer:nth-child(3) {
+  animation-delay: 60ms;
+}
+
+.grid .scorer:nth-child(4) {
+  animation-delay: 90ms;
+}
+
+.grid .scorer:nth-child(5) {
+  animation-delay: 120ms;
+}
+
+.grid .scorer:nth-child(6) {
+  animation-delay: 150ms;
+}
+
+.grid .scorer:nth-child(n + 7) {
+  animation-delay: 180ms;
+}
+
+.btn-clock svg,
+.tally,
+.penalty-col-head strong,
+.penalty-result,
+.penalty-dot {
+  animation: pop 320ms ease-out;
+}
+
+.tally,
+.penalty-col-head strong {
+  display: inline-block;
+}
+
+.penalty-list li {
+  animation: slide-in 240ms ease-out backwards;
+}
+
+.pane-squad .panel-card {
+  animation: fade-up 280ms ease-out backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .presence.is-leaving,
+  .clockbar,
+  .timeline,
+  .empty,
+  .clock-hint,
+  .penalties-end,
+  .grid .scorer,
+  .btn-clock svg,
+  .tally,
+  .penalty-col-head strong,
+  .penalty-result,
+  .penalty-dot,
+  .penalty-list li,
+  .pane-squad .panel-card {
+    animation: none;
+  }
+
+  :where(.btn, .team-chip, .per, .tab) {
+    transition: none;
   }
 }
