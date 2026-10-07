@@ -291,6 +291,56 @@ body {
   }
 }
 
+.sub-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(228, 96, 10, 0.1);
+  border: 1px solid rgba(228, 96, 10, 0.25);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+
+.sub-alert strong {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--club);
+}
+
+.sub-alert.is-now {
+  background: var(--club);
+  border-color: var(--club);
+  color: var(--ink);
+  animation: sub-pulse 900ms ease-in-out infinite;
+}
+
+.sub-alert.is-now strong {
+  font-size: 1.3rem;
+  color: var(--ink);
+}
+
+.sub-alert.is-now svg {
+  flex: 0 0 auto;
+}
+
+.sub-dismiss {
+  margin-left: auto;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.sub-alert.is-now .sub-dismiss {
+  border-color: rgba(17, 22, 27, 0.35);
+}
+
+@keyframes sub-pulse {
+  50% {
+    opacity: 0.7;
+  }
+}
+
 .btn.btn-clock-reset {
   display: inline-flex;
   flex: 0 0 2.75rem;
@@ -547,6 +597,21 @@ body {
 
 .field-group-label {
   font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.sub-choice {
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+
+.sub-every {
+  margin-top: 0.6rem;
+}
+
+.sub-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
   color: var(--muted);
 }
 
@@ -1147,6 +1212,7 @@ input:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .banner,
+  .sub-alert.is-now,
   .clock-num.is-timeup {
     animation: none;
   }

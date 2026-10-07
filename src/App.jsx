@@ -50,6 +50,12 @@ const FORMAT_RULES_URL = {
   '11v11': 'https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/voetbalvlaanderen/Club/Jeugdvoetbal/11V11_Spelreglementjeugdvoetbalposter.pdf',
 }
 
+// Wisselmelding: aftellen vanaf zoveel seconden vooraf, en de melding
+// zoveel seconden laten staan na het wisselmoment zelf. subMinutes per ploeg:
+// null = halverwege elke periode, 0 = uit, anders om de zoveel minuten.
+const SUB_COUNTDOWN = 30
+const SUB_NOTICE = 20
+
 const uid = () => Math.random().toString(36).slice(2, 10)
 
 const emptyTeam = (ageGroup = 'U9') => {
@@ -69,6 +75,7 @@ const emptyTeam = (ageGroup = 'U9') => {
     started: false,
     activePlayerIds: [],
     runningSince: null,
+    subMinutes: null,
   }
 }
 
@@ -88,6 +95,7 @@ function normalizeTeam(team) {
     activePlayerIds: (team.activePlayerIds ?? playerIds).filter((id) => playerIds.includes(id)),
     runningSince: team.runningSince ?? null,
     penalties: team.penalties ?? [],
+    subMinutes: team.subMinutes ?? null,
   }
 }
 
@@ -425,6 +433,37 @@ export default function App() {
     return () => clearTimeout(t)
   }, [clock, periodSeconds])
 
+  // Wisselmomenten vallen op elk veelvoud van het wisselinterval binnen de
+  // periode (het einde van de periode zelf niet). Vóór een moment loopt een
+  // aftelling, op het moment zelf trilt de telefoon en blijft een melding
+  // nog even staan. Alles wordt uit de klok afgeleid, zodat het ook klopt na
+  // pauzeren, terugspoelen of terugkeren uit de achtergrond.
+  const subHalfway = match.subMinutes == null
+  const subInterval = subHalfway ? Math.floor(periodSeconds / 2) : match.subMinutes * 60
+  const subIndex = subInterval > 0 ? Math.floor(clock / subInterval) : 0
+  const lastSub = subIndex * subInterval
+  const nextSub = lastSub + subInterval
+  const subPhase =
+    subInterval <= 0
+      ? null
+      : subIndex > 0 && lastSub < periodSeconds && clock - lastSub < SUB_NOTICE
+        ? 'now'
+        : nextSub < periodSeconds && nextSub - clock <= SUB_COUNTDOWN
+          ? 'soon'
+          : null
+  // Met het vinkje verberg je de melding voor dit ene wisselmoment (ook al
+  // tijdens de aftelling); het volgende moment verschijnt gewoon weer.
+  const subKey = subPhase && `${match.period}-${subPhase === 'now' ? lastSub : nextSub}`
+  const [dismissedSub, setDismissedSub] = useState(null)
+  const subDismissed = subKey != null && subKey === dismissedSub
+  const prevSubIndex = useRef(subIndex)
+  useEffect(() => {
+    const prev = prevSubIndex.current
+    prevSubIndex.current = subIndex
+    if (subIndex <= prev || subPhase !== 'now' || subDismissed) return
+    navigator.vibrate?.([300, 120, 300, 120, 300])
+  }, [subIndex, subPhase, subDismissed])
+
   const opponentName = match.opponent?.trim() || OPPONENT
 
   const score = useMemo(() => {
@@ -503,7 +542,15 @@ export default function App() {
     setMatch((m) => ({ ...bakeElapsed(m), period: m.period - 1 }))
   }
 
-  const startMatch = ({ teamId, opponent, home, periodsCount, periodMinutes, activePlayerIds }) => {
+  const startMatch = ({
+    teamId,
+    opponent,
+    home,
+    periodsCount,
+    periodMinutes,
+    subMinutes,
+    activePlayerIds,
+  }) => {
     setState((s) => ({
       ...s,
       activeTeamId: teamId,
@@ -515,6 +562,7 @@ export default function App() {
               home,
               periodsCount,
               periodMinutes,
+              subMinutes,
               events: [],
               penalties: [],
               period: 1,
@@ -659,6 +707,39 @@ export default function App() {
                   </button>
                 )}
               </div>
+              {subPhase === 'soon' && !subDismissed && (
+                <div className="sub-alert">
+                  <span>Wisselen over</span>
+                  <strong>{nextSub - clock}s</strong>
+                  <button
+                    className="btn btn-icon btn-undo sub-dismiss"
+                    onClick={() => setDismissedSub(subKey)}
+                    aria-label="Verberg wisselmelding"
+                    title="Verberg wisselmelding"
+                  >
+                    ✓
+                  </button>
+                </div>
+              )}
+              {subPhase === 'now' && !subDismissed && (
+                <div className="sub-alert is-now" role="status">
+                  <SwapIcon />
+                  <strong>Wisselen!</strong>
+                  <span>
+                    {subHalfway
+                      ? `Halverwege periode ${match.period}`
+                      : `${mmss(lastSub)} in periode ${match.period}`}
+                  </span>
+                  <button
+                    className="btn btn-icon btn-undo sub-dismiss"
+                    onClick={() => setDismissedSub(subKey)}
+                    aria-label="Verberg wisselmelding"
+                    title="Verberg wisselmelding"
+                  >
+                    ✓
+                  </button>
+                </div>
+              )}
             </section>
 
           <HattrickBanner live={runs.live} players={squadPlayers} />
@@ -1548,6 +1629,21 @@ function PauseIcon() {
   )
 }
 
+function SwapIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        d="M4 7h11m-3-3 3 3-3 3M16 13H5m3-3-3 3 3 3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function ResetIcon() {
   return (
     <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
@@ -1681,6 +1777,7 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
   const [home, setHome] = useState(team.home)
   const [periodsCount, setPeriodsCount] = useState(team.periodsCount)
   const [periodMinutes, setPeriodMinutes] = useState(team.periodMinutes)
+  const [subMinutes, setSubMinutes] = useState(team.subMinutes)
   const [activePlayerIds, setActivePlayerIds] = useState(team.players.map((p) => p.id))
 
   const selectTeam = (id) => {
@@ -1691,6 +1788,7 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
     setHome(t.home)
     setPeriodsCount(t.periodsCount)
     setPeriodMinutes(t.periodMinutes)
+    setSubMinutes(t.subMinutes)
     setActivePlayerIds(t.players.map((p) => p.id))
   }
 
@@ -1717,6 +1815,7 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
       home,
       periodsCount,
       periodMinutes,
+      subMinutes,
       activePlayerIds,
     })
 
@@ -1847,6 +1946,59 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
               Herstel standaard ({cfg.periods} × {cfg.minutes}&apos;)
             </button>
           )}
+        </div>
+
+        <div className="panel-card">
+          <span className="choice-label">Wisselmelding</span>
+          <div className="periods sub-choice">
+            <button
+              className={subMinutes === 0 ? 'per is-on' : 'per'}
+              onClick={() => setSubMinutes(0)}
+              aria-pressed={subMinutes === 0}
+            >
+              Uit
+            </button>
+            <button
+              className={subMinutes == null ? 'per is-on' : 'per'}
+              onClick={() => setSubMinutes(null)}
+              aria-pressed={subMinutes == null}
+            >
+              Halverwege
+            </button>
+            <button
+              className={subMinutes > 0 ? 'per is-on' : 'per'}
+              onClick={() => {
+                if (!(subMinutes > 0)) setSubMinutes(Math.max(1, Math.floor(periodMinutes / 3)))
+              }}
+              aria-pressed={subMinutes > 0}
+            >
+              Om de … min
+            </button>
+          </div>
+          {subMinutes > 0 && (
+            <label className="field-group sub-every">
+              <span className="field-group-label">Minuten tussen wissels</span>
+              <input
+                className="field"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max="90"
+                value={subMinutes}
+                onChange={(e) => setSubMinutes(clampNumber(e.target.value, 1, 90))}
+                aria-label="Minuten tussen wissels"
+              />
+            </label>
+          )}
+          <p className="sub-hint">
+            {subMinutes === 0
+              ? 'Geen wisselmelding tijdens de match.'
+              : subMinutes == null
+                ? `Melding op ${mmss(Math.floor((periodMinutes * 60) / 2))} in elke periode, met 30 seconden aftellen.`
+                : subMinutes >= periodMinutes
+                  ? 'Langer dan een periode: er valt geen wisselmoment binnen de periode.'
+                  : `Melding om de ${subMinutes} min in elke periode, met 30 seconden aftellen.`}
+          </p>
         </div>
 
         <div className="panel-card">
