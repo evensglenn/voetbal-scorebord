@@ -258,7 +258,12 @@ function groupScorers(scorers) {
       groups.push({ names: [s.name], goals: s.goals, hattricks: s.hattricks })
     }
   }
-  return groups.map((g) => ({ name: formatNames(g.names), goals: g.goals, hattricks: g.hattricks }))
+  return groups.map((g) => ({
+    name: formatNames(g.names),
+    names: g.names,
+    goals: g.goals,
+    hattricks: g.hattricks,
+  }))
 }
 
 // Zet een (lopende of afgewerkte) match om in het data-formaat dat de
@@ -830,13 +835,16 @@ export default function App() {
 
   return (
     <div className="shell">
-      <Scoreboard
-        started={match.started}
-        home={match.home}
-        score={score}
-        opponentName={opponentName}
-        compact={compactBoard}
-      />
+      {/* Op het startscherm zit de titel mee in de startkaart. */}
+      {(screen !== 'match' || match.started) && (
+        <Scoreboard
+          started={match.started}
+          home={match.home}
+          score={score}
+          opponentName={opponentName}
+          compact={compactBoard}
+        />
+      )}
 
       <nav className="tabs">
         <button
@@ -1128,14 +1136,13 @@ export default function App() {
           </div>
         </>
         ) : (
-          <div className="pane pane-play">
-            <div className="no-match">
-              <p className="no-match-text">Nog geen wedstrijd bezig.</p>
-              <button className="btn btn-primary btn-start-hero" onClick={() => setStartingMatch(true)}>
-                Nieuwe wedstrijd
-              </button>
-            </div>
-          </div>
+          <Home
+            team={match}
+            history={state.history}
+            onStart={() => setStartingMatch(true)}
+            onOpenSquad={() => setScreen('squad')}
+            onOpenHistory={() => setScreen('history')}
+          />
         )
       ) : screen === 'squad' ? (
         <Squad
@@ -1429,6 +1436,39 @@ function HattrickBanner({ live, players }) {
   )
 }
 
+// Veldtekening op ware verhoudingen (in meter, 105 × 68) als decor achter het
+// scorebord en de startkaart. "slice" vult de breedte en snijdt boven en onder
+// af, zodat de lijnen niet vervormen of meeschalen wanneer de kop krimpt.
+// Staand (vertical) draait het veld een kwartslag voor hoge vlakken.
+function Pitch({ vertical = false }) {
+  return (
+    <svg
+      className="pitch"
+      viewBox={vertical ? '-3 -3 74 111' : '-3 -3 111 74'}
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <g transform={vertical ? 'translate(68 0) rotate(90)' : undefined}>
+        <g className="pitch-lines">
+          <rect x="0" y="0" width="105" height="68" />
+          <path d="M52.5 0V68" />
+          <circle cx="52.5" cy="34" r="9.15" />
+          {/* Strafschopgebied, doelgebied, boog en doel — links en gespiegeld rechts. */}
+          <path d="M0 13.84H16.5V54.16H0M0 24.84H5.5V43.16H0M16.5 26.69A9.15 9.15 0 0 1 16.5 41.31M0 30.34H-1.5V37.66H0" />
+          <path d="M105 13.84H88.5V54.16H105M105 24.84H99.5V43.16H105M88.5 26.69A9.15 9.15 0 0 0 88.5 41.31M105 30.34H106.5V37.66H105" />
+          <path d="M0 1A1 1 0 0 0 1 0M104 0A1 1 0 0 0 105 1M105 67A1 1 0 0 0 104 68M1 68A1 1 0 0 0 0 67" />
+        </g>
+        <g className="pitch-spots">
+          <circle cx="52.5" cy="34" r="0.5" />
+          <circle cx="11" cy="34" r="0.5" />
+          <circle cx="94" cy="34" r="0.5" />
+        </g>
+      </g>
+    </svg>
+  )
+}
+
 function Scoreboard({ started, home, score, opponentName, compact }) {
   const ours = { name: TEAM, goals: score.us, ours: true }
   const theirs = { name: opponentName, goals: score.them, ours: false }
@@ -1436,9 +1476,13 @@ function Scoreboard({ started, home, score, opponentName, compact }) {
 
   if (!started) {
     return (
-      <header className={compact ? 'board is-compact' : 'board'}>
+      <header className={compact ? 'board board-idle is-compact' : 'board board-idle'}>
+        <Pitch />
         <div className="board-row board-row-idle">
-          <span className="team-name team-name-ours">{TEAM} – Scorebord</span>
+          <h1 className="board-title">
+            <span className="board-title-club">{TEAM}</span>
+            <span className="board-title-sub">Scorebord</span>
+          </h1>
         </div>
       </header>
     )
@@ -1446,15 +1490,11 @@ function Scoreboard({ started, home, score, opponentName, compact }) {
 
   return (
     <header className={compact ? 'board is-compact' : 'board'}>
+      <Pitch />
       <div className="board-row">
         <div className="side">
           <span className={left.ours ? 'team-name team-name-ours' : 'team-name'}>{left.name}</span>
           <span className={left.ours ? 'goals goals-ours' : 'goals'}>{left.goals}</span>
-        </div>
-        <div className="board-mid">
-          <span className="dash" aria-hidden="true">
-            –
-          </span>
         </div>
         <div className="side side-right">
           <span className={right.ours ? 'team-name team-name-ours' : 'team-name'}>{right.name}</span>
@@ -1938,6 +1978,92 @@ function Squad({
   )
 }
 
+// Startscherm zolang er geen wedstrijd bezig is: een duidelijke aftrapknop,
+// plus een blik op hoe het de ploeg tot nu toe verging.
+function Home({ team, history, onStart, onOpenSquad, onOpenHistory }) {
+  // De historiek kent geen ploeg-id, enkel de leeftijdscategorie.
+  const played = history.filter((h) => h.ageGroup === team.ageGroup)
+
+  const tally = {}
+  for (const h of played) {
+    for (const s of h.scorers ?? []) {
+      if (s.name === 'Own goal') continue
+      // Oudere historiek bewaarde enkel de samengevoegde regel ("A, B & C").
+      for (const name of s.names ?? s.name.split(/, | & /)) {
+        tally[name] = (tally[name] ?? 0) + s.goals
+      }
+    }
+  }
+  const topScorers = Object.entries(tally)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3)
+
+  const cfg = AGE_CONFIG[team.ageGroup] ?? AGE_CONFIG.U9
+
+  return (
+    <div className="pane pane-play pane-home">
+      <section className="home-hero">
+        <Pitch vertical />
+        <h1 className="board-title">
+          <span className="board-title-club">{TEAM}</span>
+          <span className="board-title-sub">Scorebord</span>
+        </h1>
+        <img className="home-hero-logo" src={CLUB_LOGO} alt="" />
+        <div className="home-hero-meta">
+          <span className="age-chip">{team.ageGroup}</span>
+          <span>{FORMAT_LABELS[cfg.format] ?? cfg.format}</span>
+          <span aria-hidden="true">·</span>
+          <span>
+            {team.periodsCount} × {team.periodMinutes}'
+          </span>
+        </div>
+        <h2 className="home-hero-title">Klaar voor de aftrap?</h2>
+        <p className="home-hero-sub">
+          {team.players.length === 0
+            ? 'Nog geen spelers in deze ploeg.'
+            : `${team.players.length} ${team.players.length === 1 ? 'speler' : 'spelers'} in de kern`}
+        </p>
+        <button className="btn btn-start-hero" onClick={onStart}>
+          <PlayIcon />
+          <span>Nieuwe wedstrijd</span>
+        </button>
+        {team.players.length === 0 && (
+          <button className="home-hero-link" onClick={onOpenSquad}>
+            Voeg eerst spelers toe →
+          </button>
+        )}
+      </section>
+
+      {played.length === 0 ? (
+        <p className="empty home-empty">
+          Na je eerste wedstrijd verschijnen hier de topschutters van je {team.ageGroup}.
+        </p>
+      ) : (
+        <>
+          {topScorers.length > 0 && (
+            <>
+              <h2 className="section-title">Topschutters</h2>
+              <ol className="home-scorers">
+                {topScorers.map(([name, goals], i) => (
+                  <li key={name}>
+                    <span className="home-scorer-rank">{i + 1}</span>
+                    <span className="home-scorer-name">{name}</span>
+                    <span className="home-scorer-goals">{goals}</span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+
+          <button className="home-more" onClick={onOpenHistory}>
+            Bekijk volledige historiek →
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 function History({ history, onView, onDelete }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null)
 
@@ -1962,7 +2088,8 @@ function History({ history, onView, onDelete }) {
                 <span className="history-item-info">
                   <span className="history-item-opponent">{h.theirName}</span>
                   <span className="history-item-meta">
-                    {h.ageGroup} · {h.date}
+                    <span className="age-chip">{h.ageGroup}</span>
+                    {h.date}
                   </span>
                 </span>
               </button>
