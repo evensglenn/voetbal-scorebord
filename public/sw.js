@@ -4,7 +4,7 @@
 // het manifest) altijd door. Enkel de gehashte build-bestanden onder /assets/
 // (hun naam verandert zodra de inhoud verandert) mogen veilig eerst uit de cache.
 
-const CACHE = 'scorebord-v0.35.2'
+const CACHE = 'scorebord-v0.46.2'
 
 self.addEventListener('install', () => self.skipWaiting())
 
@@ -46,5 +46,16 @@ self.addEventListener('fetch', (event) => {
           .then((response) => store(request, response))
           .catch(() => hit),
     ),
+  )
+})
+
+// Tik op een melding (ook vanop het horloge): breng de app weer naar voren.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const open = clients.find((client) => 'focus' in client)
+      return open ? open.focus() : self.clients.openWindow(self.registration.scope)
+    }),
   )
 })

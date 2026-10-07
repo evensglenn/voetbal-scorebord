@@ -56,6 +56,7 @@ const CHART_FOOTPRINT = 380
 const SECTION_GAP = 76
 const SCORER_ROW_H = 66
 const TIMELINE_ROW_H = 58
+const PENALTY_ROW_H = 64
 
 // Gedeelde plattegrond: bepaalt waar elk onderdeel begint en hoe hoog de hele
 // afbeelding moet worden. drawSummary() en heightFor() gebruiken exact dezelfde
@@ -80,7 +81,9 @@ function computeLayout(d) {
   const timelineEnd = timelineTop + timelineContentH
 
   const penaltiesTop = timelineEnd + SECTION_GAP
-  const penaltiesContentH = d.penalties ? 60 + d.penalties.attempts.length * TIMELINE_ROW_H : 0
+  // Titel + kolomkoppen + één rij per beurt (de langste kolom telt).
+  const penaltyRounds = d.penalties ? Math.max(d.penalties.us.total, d.penalties.them.total) : 0
+  const penaltiesContentH = d.penalties ? 64 + 70 + penaltyRounds * PENALTY_ROW_H : 0
   const penaltiesEnd = d.penalties ? penaltiesTop + penaltiesContentH : timelineEnd
 
   const totalHeight = penaltiesEnd + 200
@@ -373,6 +376,16 @@ function drawTimeline(ctx, d, layout) {
   }
 }
 
+// Kort een tekst in met "…" tot ze binnen maxW past (in het huidige font).
+function fitText(ctx, text, maxW) {
+  if (ctx.measureText(text).width <= maxW) return text
+  let t = text
+  while (t.length > 1 && ctx.measureText(`${t}…`).width > maxW) t = t.slice(0, -1)
+  return `${t}…`
+}
+
+// Strafschoppenreeks zoals in de app: beide ploegen in een eigen kolom, met
+// de stand bovenaan en één rij per beurt.
 function drawPenalties(ctx, d, top) {
   if (!d.penalties) return
 
@@ -380,49 +393,57 @@ function drawPenalties(ctx, d, top) {
   ctx.fillStyle = FADED
   ctx.font = font(600, 30)
   ctx.textAlign = 'left'
-  ctx.fillText("Penalty's", PAD, y)
+  ctx.fillText('Strafschoppen reeks', PAD, y)
+  y += 64
 
-  const { us, them } = d.penalties
-  ctx.font = font(700, 32)
-  ctx.textAlign = 'right'
-  // Rechts uitgelijnd en stuk voor stuk getekend, zodat onze score in de
-  // clubkleur en het streepje in het grijs kan staan.
-  const themText = `${them.scored}/${them.total}`
-  const dashText = ' – '
-  let x = DESIGN_W - PAD
-  ctx.fillStyle = PAPER
-  ctx.fillText(themText, x, y)
-  x -= ctx.measureText(themText).width
-  ctx.fillStyle = FADED
-  ctx.fillText(dashText, x, y)
-  x -= ctx.measureText(dashText).width
-  ctx.fillStyle = CLUB
-  ctx.fillText(`${us.scored}/${us.total}`, x, y)
-  y += 60
+  const GAP = 44
+  const colW = (DESIGN_W - 2 * PAD - GAP) / 2
+  const columns = [
+    { team: 'us', name: d.ourName, color: CLUB, ...d.penalties.us },
+    { team: 'them', name: d.theirName, color: AWAY, ...d.penalties.them },
+  ]
 
-  d.penalties.attempts.forEach((a, i) => {
-    ctx.fillStyle = a.team === 'us' ? CLUB : AWAY
-    ctx.font = font(700, 34)
-    ctx.textAlign = 'left'
-    ctx.fillText(`${i + 1}.`, PAD, y)
+  columns.forEach((col, c) => {
+    const x = PAD + c * (colW + GAP)
+    let rowY = y
 
-    ctx.fillStyle = PAPER
-    ctx.font = font(500, 34)
-    ctx.fillText(a.name, PAD + 50, y)
-
-    ctx.fillStyle = a.scored ? GREEN : RED
-    ctx.font = font(700, 34)
+    // Kop: ploegnaam links, stand rechts, gekleurde lijn eronder
+    ctx.font = font(700, 36)
     ctx.textAlign = 'right'
-    ctx.fillText(a.scored ? '✓' : '✗', DESIGN_W - PAD, y)
+    ctx.fillStyle = col.color
+    const scoreText = `${col.scored}/${col.total}`
+    ctx.fillText(scoreText, x + colW, rowY)
+    const scoreW = ctx.measureText(scoreText).width
+    ctx.font = font(600, 32)
+    ctx.textAlign = 'left'
+    ctx.fillText(fitText(ctx, col.name ?? '', colW - scoreW - 20), x, rowY)
+    ctx.fillRect(x, rowY + 16, colW, 4)
+    rowY += 70
 
-    ctx.strokeStyle = HAIR
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(PAD, y + 20)
-    ctx.lineTo(DESIGN_W - PAD, y + 20)
-    ctx.stroke()
+    d.penalties.attempts
+      .filter((a) => a.team === col.team)
+      .forEach((a, i) => {
+        // Groen vinkje of rood kruisje, rechts in de kolom
+        ctx.fillStyle = a.scored ? GREEN : RED
+        ctx.font = font(700, 34)
+        ctx.textAlign = 'right'
+        ctx.fillText(a.scored ? '✓' : '✗', x + colW, rowY)
 
-    y += TIMELINE_ROW_H
+        ctx.fillStyle = PAPER
+        ctx.font = font(500, 32)
+        ctx.textAlign = 'left'
+        const label = col.team === 'us' ? a.name : `Strafschop ${i + 1}`
+        ctx.fillText(fitText(ctx, label, colW - 56), x, rowY)
+
+        ctx.strokeStyle = HAIR
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.moveTo(x, rowY + 24)
+        ctx.lineTo(x + colW, rowY + 24)
+        ctx.stroke()
+
+        rowY += PENALTY_ROW_H
+      })
   })
 }
 

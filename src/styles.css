@@ -119,6 +119,13 @@ body {
   flex-direction: column;
   align-items: center;
   align-self: end;
+  /* Streepje op hoogte van het midden van de cijfers */
+  padding-bottom: 0.55rem;
+  transition: padding 180ms ease;
+}
+
+.board.is-compact .board-mid {
+  padding-bottom: 0.3rem;
 }
 
 .dash {
@@ -127,15 +134,6 @@ body {
   color: rgba(255, 255, 255, 0.35);
   line-height: 1.4;
   transition: font-size 180ms ease, line-height 180ms ease;
-}
-
-.age-badge {
-  margin-top: -0.3rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.45);
-  transition: font-size 180ms ease, margin 180ms ease;
 }
 
 .board.is-compact {
@@ -156,11 +154,6 @@ body {
 .board.is-compact .dash {
   font-size: 1.5rem;
   line-height: 1.1;
-}
-
-.board.is-compact .age-badge {
-  margin-top: 0;
-  font-size: 0.72rem;
 }
 
 .board.is-compact .board-row-idle .team-name {
@@ -214,6 +207,40 @@ body {
   padding: 0.85rem 1rem;
   background: var(--paper);
   border-bottom: 1px solid var(--line);
+}
+
+/* Voortgang over alle periodes: één segment per periode */
+.period-progress {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.7rem;
+}
+
+.period-seg {
+  position: relative;
+  flex: 1;
+  height: 0.4rem;
+  overflow: hidden;
+  background: var(--line-soft);
+  border-radius: 999px;
+}
+
+.period-seg.is-current {
+  background: rgba(228, 96, 10, 0.18);
+}
+
+.period-seg-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--club);
+  border-radius: inherit;
+  transition: width 1s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .period-seg-fill {
+    transition: none;
+  }
 }
 
 .periods {
@@ -289,6 +316,48 @@ body {
   50% {
     color: var(--club);
   }
+}
+
+.period-change.period-over {
+  margin: 0.7rem 0 0;
+}
+
+/* Na de laatste periode: twee keuzes, op een eigen rij onder de tekst */
+.period-change.period-over.is-final {
+  flex-wrap: wrap;
+}
+
+.period-over-actions {
+  display: grid;
+  flex: 1 0 100%;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.period-over-actions .btn-period-over {
+  justify-content: center;
+  padding-right: 0.3rem;
+  padding-left: 0.3rem;
+  white-space: nowrap;
+}
+
+.btn.btn-period-over {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.clock-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.clock-hint.is-warning {
+  font-weight: 600;
+  color: var(--danger);
 }
 
 .sub-alert {
@@ -444,17 +513,11 @@ body {
     font-size: 0.95rem;
   }
 
-  .btn-clock {
-    min-width: 2.75rem;
-    width: 2.75rem;
-    padding-right: 0;
-    padding-left: 0;
+  .btn.btn-clock {
+    padding-right: 0.7rem;
+    padding-left: 0.7rem;
+    white-space: nowrap;
   }
-
-  .btn-clock span {
-    display: none;
-  }
-
 }
 
 /* Algemene knoppen en velden */
@@ -479,12 +542,6 @@ body {
 .btn-primary {
   background: var(--ink);
   border-color: var(--ink);
-  color: var(--paper);
-}
-
-.btn-away {
-  background: var(--away);
-  border-color: var(--away);
   color: var(--paper);
 }
 
@@ -670,126 +727,187 @@ body {
   gap: 0.5rem;
 }
 
-.btn.btn-penalties-toggle {
+/* Wat een nemer al trapte: groen = raak, rood = gemist */
+.penalty-dots {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  width: calc(100% - 2rem);
-  margin: 1rem 1rem 0;
-  background: transparent;
-  border-style: dashed;
-  border-color: rgba(17, 22, 27, 0.3);
-  color: var(--muted);
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-left: auto;
 }
 
-.btn-penalties-toggle span {
-  font-size: 1.2rem;
-  font-weight: 600;
-  line-height: 1;
+.penalty-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  background: var(--danger);
+  border: 1.5px solid var(--paper);
+  border-radius: 50%;
 }
 
-.penalties {
-  margin-top: 0.7rem;
+.penalty-dot.is-scored {
+  background: var(--success);
 }
 
-.penalties-tally {
-  font-weight: 600;
-  color: var(--muted);
+/* Keuze in het venster: twee grote knoppen naast elkaar */
+.penalty-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin: 0.9rem 0 1rem;
 }
 
-.penalties-tally-us {
-  color: var(--club);
-}
-
-.penalty-takers {
+.penalty-choice .btn {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  list-style: none;
-  margin: 0.7rem 0 0;
-  padding: 0;
-}
-
-.penalty-takers li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.penalty-taker-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 1rem;
-}
-
-.penalty-taker-actions {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.btn-penalty {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.6rem;
-  min-height: 2.6rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--paper);
+  gap: 0.45rem;
+  min-height: 6rem;
   font-size: 1.1rem;
   font-weight: 700;
-  cursor: pointer;
 }
 
-.btn-penalty-yes {
+.btn.penalty-choice-yes {
+  background: rgba(26, 122, 60, 0.1);
+  border-color: var(--success);
   color: var(--success);
 }
 
-.btn-penalty-no {
+.btn.penalty-choice-no {
+  background: rgba(209, 51, 44, 0.08);
+  border-color: var(--danger);
   color: var(--danger);
 }
 
-.penalty-list {
+.penalty-choice-x {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.penalty-choice .ball-scored-ball {
+  font-size: 1.6rem;
+}
+
+.ball-scored {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+}
+
+.ball-scored-ball {
+  font-size: 1.35rem;
+}
+
+.ball-scored-check {
+  position: absolute;
+  right: -0.35rem;
+  bottom: -0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.95rem;
+  height: 0.95rem;
+  background: var(--success);
+  border: 1.5px solid var(--paper);
+  border-radius: 50%;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--paper);
+}
+
+.penalties-end {
+  padding: 1.2rem 1rem 0;
+}
+
+.btn.btn-end-match {
+  width: 100%;
+  min-height: 3.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* De reeks: beide ploegen in een eigen kolom, één rij per beurt */
+.penalty-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 0 1rem;
+}
+
+.penalty-col {
+  min-width: 0;
+}
+
+.penalty-col-head {
   display: flex;
-  flex-direction: column;
-  gap: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--away);
+  font-weight: 600;
+  color: var(--away);
+}
+
+.penalty-col.is-ours .penalty-col-head {
+  border-bottom-color: var(--club);
+  color: var(--club);
+}
+
+.penalty-col-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.penalty-col-head strong {
+  font-size: 1.15rem;
+}
+
+.penalty-list {
   list-style: none;
-  margin: 0.9rem 0 0;
+  margin: 0;
   padding: 0;
 }
 
 .penalty-list li {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--line-soft);
+  gap: 0.4rem;
+  min-height: 2.9rem;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-.penalty-list-index {
-  color: var(--muted);
-  font-size: 0.85rem;
-  width: 1.3rem;
+.penalty-result {
+  display: inline-flex;
+  flex: 0 0 1.4rem;
+  align-items: center;
+  justify-content: center;
+  height: 1.4rem;
+  background: var(--danger);
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--paper);
+}
+
+.penalty-result.is-scored {
+  background: var(--success);
 }
 
 .penalty-list-name {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.penalty-list-name.is-ours {
-  color: var(--club);
-  font-weight: 500;
-}
-
-.penalty-list-result {
-  font-weight: 700;
-  color: var(--danger);
-}
-
-.penalty-list-result.is-scored {
-  color: var(--success);
+.btn.btn-penalty-remove {
+  flex: 0 0 2.5rem;
+  width: 2.5rem;
+  min-height: 2.5rem;
+  border: 0;
 }
 
 .btn-remove-team {
@@ -883,6 +1001,19 @@ input:focus-visible {
   color: var(--paper);
 }
 
+.scorer-opponent {
+  background: var(--away);
+  border-color: var(--away);
+  border-left-color: var(--ink);
+  color: var(--paper);
+}
+
+.scorer-opponent:active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
 .scorer-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -896,20 +1027,6 @@ input:focus-visible {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--club);
-}
-
-.opponent-action {
-  padding: 0.7rem 1rem 0;
-}
-
-.btn-opponent {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  width: 100%;
-  min-height: 3rem;
-  font-weight: 600;
 }
 
 .last-action {
@@ -964,22 +1081,15 @@ input:focus-visible {
   color: var(--ink);
 }
 
-/* Afsluitende acties onderaan de match */
-.match-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  padding: 1rem 1rem 0;
-}
-
-.btn.btn-end {
-  border-color: var(--ink);
-  font-weight: 600;
+.match-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 1rem;
+  padding: 0 1rem;
 }
 
 .btn-cancel-match {
-  grid-column: 1 / -1;
-  justify-self: center;
   min-height: 2.75rem;
   padding: 0 0.75rem;
   background: none;
@@ -1258,7 +1368,6 @@ input:focus-visible {
   .team-name,
   .goals,
   .dash,
-  .age-badge,
   .scorer {
     transition: none;
   }
@@ -1529,6 +1638,10 @@ input:focus-visible {
 .dialog {
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
+}
+
+.dialog .sub-hint {
+  margin-top: 0.5rem;
 }
 
 .dialog-wide {

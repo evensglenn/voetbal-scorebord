@@ -82,6 +82,34 @@ function unlockSpeech() {
   synth.speak(utterance)
 }
 
+// Toont ook een gewone telefoonmelding, die Android doorstuurt naar een
+// gekoppeld horloge. Enkel met toestemming, en via de service worker: Android
+// Chrome kent geen losse `new Notification`.
+function notify(title, body) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  navigator.serviceWorker?.ready
+    .then((registration) =>
+      registration.showNotification(title, {
+        body,
+        tag: 'scorebord-alert',
+        renotify: true,
+        icon: `${import.meta.env.BASE_URL}icon-192.png`,
+      }),
+    )
+    .catch(() => {})
+}
+
+// Toestemming kan enkel vanuit een tik gevraagd worden; we vragen het één
+// keer, bij de start van de wedstrijd of van de klok.
+function askNotificationPermission() {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'default') return
+  try {
+    Notification.requestPermission()?.catch?.(() => {})
+  } catch {
+    // oudere browsers zonder toestemmingsvraag: dan blijft het bij trillen en spraak
+  }
+}
+
 const uid = () => Math.random().toString(36).slice(2, 10)
 
 const emptyTeam = (ageGroup = 'U9') => {
@@ -122,6 +150,7 @@ function normalizeTeam(team) {
     runningSince: team.runningSince ?? null,
     penalties: team.penalties ?? [],
     subMinutes: team.subMinutes ?? null,
+    extraPeriods: team.extraPeriods ?? 0,
   }
 }
 
@@ -376,7 +405,7 @@ export default function App() {
   const [resetting, setResetting] = useState(false)
   const [ending, setEnding] = useState(false)
   const [canceling, setCanceling] = useState(false)
-  const [sharing, setSharing] = useState(false)
+  const [editingSubs, setEditingSubs] = useState(false)
   const [viewingHistory, setViewingHistory] = useState(null)
   const [compactBoard, setCompactBoard] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
@@ -469,8 +498,13 @@ export default function App() {
     (match.runningSince ? Math.floor((Date.now() - match.runningSince) / 1000) : 0)
   const periodSeconds = match.periodMinutes * 60
   const extraSeconds = Math.max(0, clock - periodSeconds)
+  // Enkel zolang de nieuwe periode nog niet begonnen is: daarna is
+  // "Periode x gestart · Klok staat klaar" niet meer juist.
   const canUndoPeriod =
-    match.period > 1 && !match.events.some((event) => event.period === match.period)
+    match.period > 1 &&
+    !running &&
+    match.clocks[match.period - 1] === 0 &&
+    !match.events.some((event) => event.period === match.period)
 
   const [timeUp, setTimeUp] = useState(false)
   const prevClock = useRef(clock)
@@ -481,7 +515,9 @@ export default function App() {
     // klok in één keer over de periodegrens heen springen.
     if (periodSeconds <= 0 || prev >= periodSeconds || clock < periodSeconds) return
     navigator.vibrate?.([160, 90, 160])
-    say(match.period >= match.periodsCount ? 'Einde wedstrijd' : `Einde periode ${match.period}`)
+    const ended = match.period >= match.periodsCount ? 'Einde wedstrijd' : `Einde periode ${match.period}`
+    say(ended)
+    notify(ended, `${TEAM} ${score.us}–${score.them} ${opponentName}`)
     setTimeUp(true)
     const t = setTimeout(() => setTimeUp(false), 1200)
     return () => clearTimeout(t)
@@ -505,18 +541,26 @@ export default function App() {
         : nextSub < periodSeconds && nextSub - clock <= SUB_COUNTDOWN
           ? 'soon'
           : null
-  // Met het vinkje verberg je de melding voor dit ene wisselmoment (ook al
-  // tijdens de aftelling); het volgende moment verschijnt gewoon weer.
+  // Met het vinkje verberg je de melding voor dit ene wisselmoment; het
+  // volgende moment verschijnt gewoon weer.
   const subKey = subPhase && `${match.period}-${subPhase === 'now' ? lastSub : nextSub}`
   const [dismissedSub, setDismissedSub] = useState(null)
   const subDismissed = subKey != null && subKey === dismissedSub
+  // Wie tijdens de match de wisseloptie wijzigt, krijgt daardoor niet meteen
+  // een melding: enkel echte overgangen van de klok tellen.
+  const prevSubInterval = useRef(subInterval)
+  const intervalChanged = prevSubInterval.current !== subInterval
+  useEffect(() => {
+    prevSubInterval.current = subInterval
+  })
   const prevSubIndex = useRef(subIndex)
   useEffect(() => {
     const prev = prevSubIndex.current
     prevSubIndex.current = subIndex
-    if (subIndex <= prev || subPhase !== 'now' || subDismissed) return
+    if (intervalChanged || subIndex <= prev || subPhase !== 'now' || subDismissed) return
     navigator.vibrate?.([300, 120, 300, 120, 300])
     say('Tijd voor wissel')
+    notify('Tijd voor wissel', `Periode ${match.period} · ${mmss(lastSub)}`)
   }, [subIndex, subPhase, subDismissed])
 
   // Aankondiging bij het begin van de aftelling — niet als je er pas middenin
@@ -525,10 +569,28 @@ export default function App() {
   useEffect(() => {
     const prev = prevSubPhase.current
     prevSubPhase.current = subPhase
-    if (prev === 'soon' || subPhase !== 'soon' || subDismissed) return
+    if (intervalChanged || prev === 'soon' || subPhase !== 'soon' || subDismissed) return
     if (nextSub - clock < SUB_COUNTDOWN - 3) return
     say(`Wissel over ${SUB_COUNTDOWN} seconden`)
+    notify(`Wissel over ${SUB_COUNTDOWN} seconden`, `Periode ${match.period}`)
   }, [subPhase, subDismissed, nextSub, clock])
+
+  // Een doelpunt terwijl de klok stilstaat wijst meestal op een vergeten
+  // start: dan tonen we even een herinnering bij de klok.
+  const [goalWhilePaused, setGoalWhilePaused] = useState(false)
+  useEffect(() => {
+    if (running) setGoalWhilePaused(false)
+    if (!goalWhilePaused || running) return
+    const t = setTimeout(() => setGoalWhilePaused(false), 8000)
+    return () => clearTimeout(t)
+  }, [goalWhilePaused, running])
+
+  const clockLabel = running ? 'Pauze' : clock > 0 ? 'Ga verder' : 'Start'
+  const periodOver = periodSeconds > 0 && clock >= periodSeconds
+  const lastPeriod = match.period >= match.periodsCount
+  // Strafschoppen, samenvatting en beëindigen horen pas bij het einde van de
+  // match: na de laatste periode, of zodra er al strafschoppen genomen zijn.
+  const matchFinished = (lastPeriod && periodOver) || match.penalties.length > 0
 
   const opponentName = match.opponent?.trim() || OPPONENT
 
@@ -553,9 +615,8 @@ export default function App() {
     [match.players, match.activePlayerIds],
   )
 
-  const summary = useMemo(() => buildSummary(match), [match])
-
   const addGoal = (team, playerId = null) => {
+    if (!running && clock < periodSeconds) setGoalWhilePaused(true)
     setMatch((m) => ({
       ...m,
       events: [
@@ -565,7 +626,8 @@ export default function App() {
           team,
           playerId,
           period: m.period,
-          clock: m.clocks[m.period - 1] || null,
+          // Lopende tijd meetellen: de opgeslagen klok wordt pas bij pauze bijgewerkt.
+          clock: bakeElapsed(m).clocks[m.period - 1] || null,
         },
       ],
     }))
@@ -595,8 +657,32 @@ export default function App() {
     return { ...m, clocks, runningSince: null }
   }
 
+  // Na de laatste periode: de klok stilzetten en meteen naar het
+  // penaltyblok, opengeklapt en in beeld.
+  const [penaltiesOpen, setPenaltiesOpen] = useState(false)
+  // Het blok enkel open laten zolang de match ook echt afgelopen is: na een
+  // extra periode, terugzetten van de klok of ongedaan maken klapt het weer
+  // dicht, zodat het pas na een nieuwe tik op "Strafschoppen" verschijnt.
+  useEffect(() => {
+    if (!matchFinished) setPenaltiesOpen(false)
+  }, [matchFinished])
+  // Tijdens de strafschoppen maakt het strafschoppenblok "Wie scoorde?" overbodig.
+  const penaltiesShown = matchFinished && (penaltiesOpen || match.penalties.length > 0)
+  const goToPenalties = () => {
+    if (running) setMatch(bakeElapsed)
+    setPenaltiesOpen(true)
+    requestAnimationFrame(() =>
+      document
+        .getElementById('penalties')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    )
+  }
+
   const toggleClock = () => {
-    if (!running) unlockSpeech()
+    if (!running) {
+      unlockSpeech()
+      askNotificationPermission()
+    }
     setMatch((m) => (m.runningSince ? bakeElapsed(m) : { ...m, runningSince: Date.now() }))
   }
 
@@ -607,7 +693,30 @@ export default function App() {
 
   const undoPeriodChange = () => {
     if (match.period <= 1) return
-    setMatch((m) => ({ ...bakeElapsed(m), period: m.period - 1 }))
+    setMatch((m) => {
+      // Een net toegevoegde extra periode ongedaan maken haalt ze ook weer weg.
+      const dropExtra = m.extraPeriods > 0 && m.period === m.periodsCount
+      return {
+        ...bakeElapsed(m),
+        period: m.period - 1,
+        ...(dropExtra && {
+          periodsCount: m.periodsCount - 1,
+          extraPeriods: m.extraPeriods - 1,
+        }),
+      }
+    })
+  }
+
+  // Na de laatste periode nog een periode bijspelen, even lang als de andere.
+  // Ze telt mee als extra, zodat de volgende match weer met het gewone aantal
+  // periodes begint.
+  const addExtraPeriod = () => {
+    setMatch((m) => ({
+      ...bakeElapsed(m),
+      periodsCount: m.periodsCount + 1,
+      extraPeriods: m.extraPeriods + 1,
+      period: m.periodsCount + 1,
+    }))
   }
 
   const startMatch = ({
@@ -631,6 +740,7 @@ export default function App() {
               periodsCount,
               periodMinutes,
               subMinutes,
+              extraPeriods: 0,
               events: [],
               penalties: [],
               period: 1,
@@ -642,6 +752,8 @@ export default function App() {
           : t,
       ),
     }))
+    askNotificationPermission()
+    setPenaltiesOpen(false)
     setScreen('match')
     setStartingMatch(false)
   }
@@ -659,13 +771,18 @@ export default function App() {
               events: [],
               penalties: [],
               period: 1,
-              clocks: Array(t.periodsCount).fill(0),
+              periodsCount: t.periodsCount - t.extraPeriods,
+              extraPeriods: 0,
+              clocks: [],
               runningSince: null,
             })
           : t,
       ),
     }))
+    setPenaltiesOpen(false)
     setEnding(false)
+    // Meteen de samenvatting tonen om te delen; later terug te vinden in de Historiek.
+    setViewingHistory(finished)
   }
 
   const cancelMatch = () => {
@@ -675,9 +792,12 @@ export default function App() {
       events: [],
       penalties: [],
       period: 1,
-      clocks: Array(m.periodsCount).fill(0),
+      periodsCount: m.periodsCount - m.extraPeriods,
+      extraPeriods: 0,
+      clocks: [],
       runningSince: null,
     }))
+    setPenaltiesOpen(false)
     setCanceling(false)
   }
 
@@ -700,7 +820,6 @@ export default function App() {
         home={match.home}
         score={score}
         opponentName={opponentName}
-        ageGroup={match.ageGroup}
         compact={compactBoard}
       />
 
@@ -735,178 +854,250 @@ export default function App() {
         match.started ? (
         <>
           <div className="pane pane-play">
-            <section className="clockbar">
-              <div className="clock">
-                <div className="clock-readout">
-                  <span className="clock-label">Periode {match.period}</span>
-                  <span className={timeUp ? 'clock-num is-timeup' : 'clock-num'}>
-                    {mmss(Math.min(clock, periodSeconds))}
-                    {extraSeconds > 0 && <span className="clock-extra">+{mmss(extraSeconds)}</span>}
-                  </span>
+            {/* Tijdens de strafschoppen spelen klok en periodes geen rol meer. */}
+            {!penaltiesShown && (
+              <section className="clockbar">
+                <div className="period-progress" aria-hidden="true">
+                  {PERIODS.map((p) => {
+                    const fill =
+                      p < match.period
+                        ? 1
+                        : p > match.period || periodSeconds <= 0
+                          ? 0
+                          : Math.min(1, clock / periodSeconds)
+                    return (
+                      <span
+                        key={p}
+                        className={p === match.period ? 'period-seg is-current' : 'period-seg'}
+                      >
+                        <span className="period-seg-fill" style={{ width: `${fill * 100}%` }} />
+                      </span>
+                    )
+                  })}
                 </div>
-                <button
-                  className={running ? 'btn btn-clock is-running' : 'btn btn-clock'}
-                  onClick={toggleClock}
-                  aria-label={running ? 'Pauze' : 'Start'}
-                  title={running ? 'Pauze' : 'Start'}
-                >
-                  {running ? <PauseIcon /> : <PlayIcon />}
-                  <span>{running ? 'Pauze' : 'Start'}</span>
-                </button>
-                {match.period < PERIODS.length && (
+                <div className="clock">
+                  <div className="clock-readout">
+                    <span className="clock-label">Periode {match.period}</span>
+                    <span className={timeUp ? 'clock-num is-timeup' : 'clock-num'}>
+                      {mmss(Math.min(clock, periodSeconds))}
+                      {extraSeconds > 0 && <span className="clock-extra">+{mmss(extraSeconds)}</span>}
+                    </span>
+                  </div>
                   <button
-                    className="btn btn-next-period"
-                    onClick={advancePeriod}
-                    aria-label={`Naar periode ${match.period + 1}`}
-                    title={`Naar periode ${match.period + 1}`}
+                    className={running ? 'btn btn-clock is-running' : 'btn btn-clock'}
+                    onClick={toggleClock}
+                    aria-label={clockLabel}
+                    title={clockLabel}
                   >
-                    <span>{match.period + 1}</span>
-                    <span className="next-arrow" aria-hidden="true">→</span>
+                    {running ? <PauseIcon /> : <PlayIcon />}
+                    <span>{clockLabel}</span>
                   </button>
+                  {match.period < PERIODS.length && !periodOver && (
+                    <button
+                      className="btn btn-next-period"
+                      onClick={advancePeriod}
+                      aria-label={`Naar periode ${match.period + 1}`}
+                      title={`Naar periode ${match.period + 1}`}
+                    >
+                      <span>{match.period + 1}</span>
+                      <span className="next-arrow" aria-hidden="true">→</span>
+                    </button>
+                  )}
+                  {clock > 0 && (
+                    <button
+                      className="btn btn-quiet btn-clock-reset"
+                      onClick={() => setResetting(true)}
+                      aria-label="Klok terug op nul"
+                      title="Klok terug op nul"
+                    >
+                      <ResetIcon />
+                    </button>
+                  )}
+                </div>
+                {subPhase === 'soon' && !subDismissed && (
+                  <div className="sub-alert">
+                    <span>Wisselen over</span>
+                    <strong>{nextSub - clock}s</strong>
+                  </div>
                 )}
-                {clock > 0 && (
-                  <button
-                    className="btn btn-quiet btn-clock-reset"
-                    onClick={() => setResetting(true)}
-                    aria-label="Klok terug op nul"
-                    title="Klok terug op nul"
-                  >
-                    <ResetIcon />
-                  </button>
+                {subPhase === 'now' && !subDismissed && (
+                  <div className="sub-alert is-now" role="status">
+                    <SwapIcon />
+                    <strong>Wisselen!</strong>
+                    <span>
+                      {subHalfway
+                        ? `Halverwege periode ${match.period}`
+                        : `${mmss(lastSub)} in periode ${match.period}`}
+                    </span>
+                    <button
+                      className="btn btn-icon btn-undo sub-dismiss"
+                      onClick={() => setDismissedSub(subKey)}
+                      aria-label="Verberg wisselmelding"
+                      title="Verberg wisselmelding"
+                    >
+                      ✓
+                    </button>
+                  </div>
                 )}
-              </div>
-              {subPhase === 'soon' && !subDismissed && (
-                <div className="sub-alert">
-                  <span>Wisselen over</span>
-                  <strong>{nextSub - clock}s</strong>
-                  <button
-                    className="btn btn-icon btn-undo sub-dismiss"
-                    onClick={() => setDismissedSub(subKey)}
-                    aria-label="Verberg wisselmelding"
-                    title="Verberg wisselmelding"
+                {periodOver && (
+                  <div
+                    className={
+                      lastPeriod ? 'period-change period-over is-final' : 'period-change period-over'
+                    }
+                    role="status"
                   >
-                    ✓
-                  </button>
-                </div>
-              )}
-              {subPhase === 'now' && !subDismissed && (
-                <div className="sub-alert is-now" role="status">
-                  <SwapIcon />
-                  <strong>Wisselen!</strong>
-                  <span>
-                    {subHalfway
-                      ? `Halverwege periode ${match.period}`
-                      : `${mmss(lastSub)} in periode ${match.period}`}
-                  </span>
-                  <button
-                    className="btn btn-icon btn-undo sub-dismiss"
-                    onClick={() => setDismissedSub(subKey)}
-                    aria-label="Verberg wisselmelding"
-                    title="Verberg wisselmelding"
-                  >
-                    ✓
-                  </button>
-                </div>
-              )}
-            </section>
+                    <div className="period-change-copy">
+                      <span className="period-change-check" aria-hidden="true">
+                        <FlagIcon />
+                      </span>
+                      <span>
+                        <strong>
+                          {lastPeriod ? 'Laatste periode voorbij' : `Periode ${match.period} voorbij`}
+                        </strong>
+                        {!lastPeriod && (
+                          <span>
+                            {extraSeconds > 0 ? `Extra tijd +${mmss(extraSeconds)}` : 'De tijd is om'}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    {lastPeriod ? (
+                      <div className="period-over-actions">
+                        <button className="btn btn-undo btn-period-over" onClick={goToPenalties}>
+                          Strafschoppen
+                        </button>
+                        <button className="btn btn-undo btn-period-over" onClick={addExtraPeriod}>
+                          Extra periode
+                        </button>
+                        <button className="btn btn-undo btn-period-over" onClick={() => setEnding(true)}>
+                          Beëindig
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="btn btn-undo btn-period-over"
+                        onClick={advancePeriod}
+                        aria-label={`Naar periode ${match.period + 1}`}
+                      >
+                        Periode {match.period + 1}
+                        <span className="next-arrow" aria-hidden="true">→</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+                {!running && !periodOver && (goalWhilePaused || clock === 0) && (
+                  <p className={goalWhilePaused ? 'clock-hint is-warning' : 'clock-hint'}>
+                    {goalWhilePaused
+                      ? 'De klok loopt niet — tik ▶ om te starten.'
+                      : 'Tik ▶ bij de aftrap om de klok te starten.'}
+                  </p>
+                )}
+              </section>
+            )}
 
           <HattrickBanner live={runs.live} players={squadPlayers} />
 
-          <h2 className="section-title">Wie scoorde?</h2>
-          {match.players.length === 0 ? (
-            <p className="empty">
-              Nog geen spelers. Voeg ze toe bij <strong>Ploegen</strong> en tik hier daarna
-              op de naam van de scorer.
-            </p>
-          ) : (
-            squadPlayers.length === 0 && (
+          {!penaltiesShown && (
+            <>
+            <h2 className="section-title">Wie scoorde?</h2>
+            {match.players.length === 0 ? (
               <p className="empty">
-                Niemand geselecteerd voor deze wedstrijd. Pas dit aan bij{' '}
-                <strong>Nieuwe wedstrijd</strong>.
+                Nog geen spelers. Voeg ze toe bij <strong>Ploegen</strong> en tik hier daarna
+                op de naam van de scorer.
               </p>
-            )
-          )}
-          <div className="grid">
-            {squadPlayers.map((p) => {
-              const onARoll = runs.live?.playerId === p.id ? runs.live.len : 0
-              return (
-                <button
-                  key={p.id}
-                  className={onARoll >= 3 ? 'scorer is-hat' : 'scorer'}
-                  onClick={() => addGoal('us', p.id)}
-                >
-                  <span className="scorer-name">{p.name}</span>
-                  {runs.hattricks[p.id] > 0 && (
-                    <span className="hats" title="Hattricks deze match">
-                      {'•'.repeat(Math.min(runs.hattricks[p.id], 3))}
-                    </span>
-                  )}
-                  {goalsBy[p.id] > 0 && <span className="tally">{goalsBy[p.id]}</span>}
-                </button>
+            ) : (
+              squadPlayers.length === 0 && (
+                <p className="empty">
+                  Niemand geselecteerd voor deze wedstrijd. Pas dit aan bij{' '}
+                  <strong>Nieuwe wedstrijd</strong>.
+                </p>
               )
-            })}
-            <button className="scorer scorer-neutral" onClick={() => addGoal('us', null)}>
-              Own goal
-            </button>
-          </div>
-
-          <div className="opponent-action">
-            <button className="btn btn-away btn-opponent" onClick={() => addGoal('them')}>
-              Tegendoelpunt
-            </button>
-          </div>
-
-          {canUndoPeriod ? (
-            <section className="period-change" aria-live="polite">
-              <div className="period-change-copy">
-                <span className="period-change-check" aria-hidden="true">✓</span>
-                <span>
-                  <strong>Periode {match.period} gestart</strong>
-                  <span>Klok staat klaar op {mmss(clock)}</span>
-                </span>
-              </div>
-              <button
-                className="btn btn-icon btn-undo"
-                onClick={undoPeriodChange}
-                aria-label="Maak ongedaan"
-                title="Maak ongedaan"
-              >
-                <UndoIcon />
+            )}
+            <div className="grid">
+              {squadPlayers.map((p) => {
+                const onARoll = runs.live?.playerId === p.id ? runs.live.len : 0
+                return (
+                  <button
+                    key={p.id}
+                    className={onARoll >= 3 ? 'scorer is-hat' : 'scorer'}
+                    onClick={() => addGoal('us', p.id)}
+                  >
+                    <span className="scorer-name">{p.name}</span>
+                    {runs.hattricks[p.id] > 0 && (
+                      <span className="hats" title="Hattricks deze match">
+                        {'•'.repeat(Math.min(runs.hattricks[p.id], 3))}
+                      </span>
+                    )}
+                    {goalsBy[p.id] > 0 && <span className="tally">{goalsBy[p.id]}</span>}
+                  </button>
+                )
+              })}
+              <button className="scorer scorer-neutral" onClick={() => addGoal('us', null)}>
+                Own goal
               </button>
-            </section>
-          ) : (
-            <LastAction
-              match={match}
-              score={score}
+              <button className="scorer scorer-opponent" onClick={() => addGoal('them')}>
+                Tegendoelpunt
+              </button>
+            </div>
+            </>
+          )}
+
+          {!penaltiesShown &&
+            (canUndoPeriod ? (
+              <section className="period-change" aria-live="polite">
+                <div className="period-change-copy">
+                  <span className="period-change-check" aria-hidden="true">✓</span>
+                  <span>
+                    <strong>Periode {match.period} gestart</strong>
+                    <span>Klok staat klaar op {mmss(clock)}</span>
+                  </span>
+                </div>
+                <button
+                  className="btn btn-icon btn-undo"
+                  onClick={undoPeriodChange}
+                  aria-label="Maak ongedaan"
+                  title="Maak ongedaan"
+                >
+                  <UndoIcon />
+                </button>
+              </section>
+            ) : (
+              <LastAction
+                match={match}
+                score={score}
+                opponentName={opponentName}
+                onUndo={undo}
+              />
+            ))}
+
+          {penaltiesShown && (
+            <Penalties
+              onEnd={() => setEnding(true)}
+              open={penaltiesOpen}
+              penalties={match.penalties}
+              players={squadPlayers}
               opponentName={opponentName}
-              onUndo={undo}
+              onAdd={addPenalty}
+              onRemove={removePenalty}
             />
           )}
-
-          <Penalties
-            penalties={match.penalties}
-            players={squadPlayers}
-            opponentName={opponentName}
-            onAdd={addPenalty}
-            onRemove={removePenalty}
-          />
-
-          <div className="match-actions">
-            <button className="btn" onClick={() => setSharing(true)}>
-              Samenvatting
-            </button>
-            <button className="btn btn-end" onClick={() => setEnding(true)}>
-              Beëindig match
-            </button>
-            <button className="btn-cancel-match" onClick={() => setCanceling(true)}>
-              Annuleer wedstrijd
-            </button>
-          </div>
 
           </div>
 
           <div className="pane pane-log">
-            <Timeline match={match} runs={runs} opponentName={opponentName} onRemove={removeEvent} />
+            {!penaltiesShown && (
+              <Timeline match={match} runs={runs} opponentName={opponentName} onRemove={removeEvent} />
+            )}
+            <div className="match-links">
+              {!penaltiesShown && (
+                <button className="btn-cancel-match" onClick={() => setEditingSubs(true)}>
+                  Stel wisselmelding opnieuw in
+                </button>
+              )}
+              <button className="btn-cancel-match" onClick={() => setCanceling(true)}>
+                Annuleer wedstrijd
+              </button>
+            </div>
           </div>
         </>
         ) : (
@@ -960,7 +1151,6 @@ export default function App() {
         <p>v{APP_VERSION}</p>
       </footer>
 
-      {sharing && <Summary data={summary} onClose={() => setSharing(false)} />}
 
       {viewingHistory && (
         <Summary data={viewingHistory} onClose={() => setViewingHistory(null)} />
@@ -1005,6 +1195,18 @@ export default function App() {
           danger
           onConfirm={cancelMatch}
           onCancel={() => setCanceling(false)}
+        />
+      )}
+
+      {editingSubs && (
+        <SubSettings
+          subMinutes={match.subMinutes}
+          periodMinutes={match.periodMinutes}
+          onSave={(subMinutes) => {
+            setMatch((m) => ({ ...m, subMinutes }))
+            setEditingSubs(false)
+          }}
+          onCancel={() => setEditingSubs(false)}
         />
       )}
 
@@ -1118,19 +1320,18 @@ function Summary({ data, onClose }) {
   )
 }
 
-function Confirm({ title, body, confirmLabel, cancelLabel = 'Nee', danger, onConfirm, onCancel }) {
-  const panel = useRef(null)
-
+// Gedrag van een venster: focus erin bij openen, Escape sluit, Tab blijft
+// binnen het venster, en de pagina erachter scrolt niet mee.
+function useModal(panel, onClose) {
   useEffect(() => {
     panel.current?.focus()
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        onCancel()
+        onClose()
         return
       }
       if (e.key !== 'Tab') return
-      // Houd de focus binnen het venster zolang het openstaat.
-      const focusable = panel.current?.querySelectorAll('button') ?? []
+      const focusable = panel.current?.querySelectorAll('button, input, select, a[href]') ?? []
       if (focusable.length === 0) return
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
@@ -1142,7 +1343,6 @@ function Confirm({ title, body, confirmLabel, cancelLabel = 'Nee', danger, onCon
         first.focus()
       }
     }
-
     document.addEventListener('keydown', onKey)
     const scroll = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -1150,7 +1350,13 @@ function Confirm({ title, body, confirmLabel, cancelLabel = 'Nee', danger, onCon
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = scroll
     }
-  }, [onCancel])
+  }, [panel, onClose])
+}
+
+function Confirm({ title, body, confirmLabel, cancelLabel = 'Nee', danger, onConfirm, onCancel }) {
+  const panel = useRef(null)
+
+  useModal(panel, onCancel)
 
   return (
     <div className="overlay" onClick={onCancel}>
@@ -1196,7 +1402,7 @@ function HattrickBanner({ live, players }) {
   )
 }
 
-function Scoreboard({ started, home, score, opponentName, ageGroup, compact }) {
+function Scoreboard({ started, home, score, opponentName, compact }) {
   const ours = { name: TEAM, goals: score.us, ours: true }
   const theirs = { name: opponentName, goals: score.them, ours: false }
   const [left, right] = home ? [ours, theirs] : [theirs, ours]
@@ -1222,7 +1428,6 @@ function Scoreboard({ started, home, score, opponentName, ageGroup, compact }) {
           <span className="dash" aria-hidden="true">
             –
           </span>
-          <span className="age-badge">{ageGroup}</span>
         </div>
         <div className="side side-right">
           <span className={right.ours ? 'team-name team-name-ours' : 'team-name'}>{right.name}</span>
@@ -1351,21 +1556,56 @@ function LastAction({ match, score, opponentName, onUndo }) {
   )
 }
 
-// Optioneel: penalty's die spelers (van beide ploegen, in eender welke
+// Optioneel: strafschoppen die spelers (van beide ploegen, in eender welke
 // volgorde — soms alle spelers van 1 ploeg na elkaar) na afloop nog nemen.
 // Los van de reguliere doelpunten/tijdslijn, want telt niet mee voor de stand.
-function Penalties({ penalties, players, opponentName, onAdd, onRemove }) {
-  const [open, setOpen] = useState(false)
+// Venster na een tik op een nemer: was de strafschop raak of niet?
+function PenaltyResult({ name, onPick, onCancel }) {
+  const panel = useRef(null)
+  useModal(panel, onCancel)
+
+  return (
+    <div className="overlay" onClick={onCancel}>
+      <div
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="penalty-result-title"
+        tabIndex={-1}
+        ref={panel}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="penalty-result-title">Strafschop {name}</h2>
+        <div className="penalty-choice">
+          <button className="btn penalty-choice-yes" onClick={() => onPick(true)}>
+            <BallScoredIcon />
+            Doelpunt
+          </button>
+          <button className="btn penalty-choice-no" onClick={() => onPick(false)}>
+            <span className="penalty-choice-x" aria-hidden="true">
+              ✗
+            </span>
+            Gemist
+          </button>
+        </div>
+        <div className="dialog-actions">
+          <button className="btn" onClick={onCancel}>
+            Annuleer
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Penalties({ onEnd, open, penalties, players, opponentName, onAdd, onRemove }) {
+  const [removing, setRemoving] = useState(null)
+  const [taking, setTaking] = useState(null)
   const expanded = open || penalties.length > 0
 
-  if (!expanded) {
-    return (
-      <button className="btn btn-penalties-toggle" onClick={() => setOpen(true)}>
-        <span aria-hidden="true">+</span>
-        Voeg penalty's toe
-      </button>
-    )
-  }
+  // Geen eigen knop meer: het blok opent via "Strafschoppen" in de melding
+  // "Laatste periode voorbij".
+  if (!expanded) return null
 
   const usScored = penalties.filter((p) => p.team === 'us' && p.scored).length
   const usTotal = penalties.filter((p) => p.team === 'us').length
@@ -1375,73 +1615,117 @@ function Penalties({ penalties, players, opponentName, onAdd, onRemove }) {
   const takers = [...players.map((p) => ({ id: p.id, name: p.name })), { id: null, name: opponentName }]
 
   return (
-    <section className="panel-card penalties">
-      <div className="choice-row">
-        <span className="choice-label">Penalty's</span>
-        {penalties.length > 0 && (
-          <span className="penalties-tally">
-            <span className="penalties-tally-us">
-              {usScored}/{usTotal}
-            </span>{' '}
-            – {themScored}/{themTotal}
-          </span>
-        )}
-      </div>
+    <section className="penalties" id="penalties">
+      <h2 className="section-title">Wie neemt een strafschop?</h2>
 
-      <ul className="penalty-takers">
+      {/* Zelfde tegels als tijdens de match; een tik vraagt daarna of de
+          strafschop raak was. De bolletjes tonen wat iemand al trapte. */}
+      <div className="grid">
         {takers.map((t) => {
           const team = t.id === null ? 'them' : 'us'
+          const taken = penalties.filter((p) => p.team === team && (team === 'them' || p.playerId === t.id))
           return (
-            <li key={t.id ?? 'them'}>
-              <span className="penalty-taker-name">{t.name}</span>
-              <div className="penalty-taker-actions">
-                <button
-                  className="btn-penalty btn-penalty-yes"
-                  onClick={() => onAdd(team, t.id, true)}
-                  aria-label={`${t.name} scoorde penalty`}
-                >
-                  ✓
-                </button>
-                <button
-                  className="btn-penalty btn-penalty-no"
-                  onClick={() => onAdd(team, t.id, false)}
-                  aria-label={`${t.name} miste penalty`}
-                >
-                  ✗
-                </button>
-              </div>
-            </li>
+            <button
+              key={t.id ?? 'them'}
+              className={team === 'them' ? 'scorer scorer-opponent' : 'scorer'}
+              onClick={() => setTaking({ ...t, team })}
+            >
+              <span className="scorer-name">{t.name}</span>
+              {taken.length > 0 && (
+                <span className="penalty-dots" aria-label={`${taken.filter((p) => p.scored).length} van ${taken.length} raak`}>
+                  {taken.map((p) => (
+                    <span key={p.id} className={p.scored ? 'penalty-dot is-scored' : 'penalty-dot'} />
+                  ))}
+                </span>
+              )}
+            </button>
           )
         })}
-      </ul>
+      </div>
+
+      {taking && (
+        <PenaltyResult
+          name={taking.name}
+          onPick={(scored) => {
+            onAdd(taking.team, taking.id, scored)
+            setTaking(null)
+          }}
+          onCancel={() => setTaking(null)}
+        />
+      )}
 
       {penalties.length > 0 && (
-        <ol className="penalty-list">
-          {penalties.map((p, i) => {
-            const name =
-              p.team === 'us' ? (players.find((pl) => pl.id === p.playerId)?.name ?? 'Onbekende speler') : opponentName
-            return (
-              <li key={p.id}>
-                <span className="penalty-list-index">{i + 1}.</span>
-                <span className={p.team === 'us' ? 'penalty-list-name is-ours' : 'penalty-list-name'}>
-                  {name}
-                </span>
-                <span className={p.scored ? 'penalty-list-result is-scored' : 'penalty-list-result'}>
-                  {p.scored ? '✓' : '✗'}
-                </span>
-                <button
-                  className="btn btn-quiet btn-icon"
-                  onClick={() => onRemove(p.id)}
-                  aria-label="Verwijder deze penalty"
-                  title="Verwijder deze penalty"
-                >
-                  <TrashIcon />
-                </button>
-              </li>
-            )
-          })}
-        </ol>
+        <>
+          <h2 className="section-title">Strafschoppen reeks</h2>
+          {/* Beide ploegen naast elkaar, één rij per beurt, zodat de stand
+              in één oogopslag te volgen is. */}
+          <div className="penalty-columns">
+            {[
+              { team: 'us', label: TEAM, scored: usScored, total: usTotal },
+              { team: 'them', label: opponentName, scored: themScored, total: themTotal },
+            ].map((col) => (
+              <div key={col.team} className={col.team === 'us' ? 'penalty-col is-ours' : 'penalty-col'}>
+                <div className="penalty-col-head">
+                  <span className="penalty-col-name">{col.label}</span>
+                  <strong>
+                    {col.scored}/{col.total}
+                  </strong>
+                </div>
+                <ol className="penalty-list">
+                  {penalties
+                    .filter((p) => p.team === col.team)
+                    .map((p, i) => {
+                      const name =
+                        p.team === 'us'
+                          ? (players.find((pl) => pl.id === p.playerId)?.name ?? 'Onbekend')
+                          : `Strafschop ${i + 1}`
+                      return (
+                        <li key={p.id}>
+                          <span
+                            className={p.scored ? 'penalty-result is-scored' : 'penalty-result'}
+                            aria-label={p.scored ? 'Gescoord' : 'Gemist'}
+                          >
+                            {p.scored ? '✓' : '✗'}
+                          </span>
+                          <span className="penalty-list-name">{name}</span>
+                          <button
+                            className="btn btn-quiet btn-icon btn-penalty-remove"
+                            onClick={() => setRemoving({ ...p, name })}
+                            aria-label="Verwijder deze strafschop"
+                            title="Verwijder deze strafschop"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </li>
+                      )
+                    })}
+                </ol>
+              </div>
+            ))}
+          </div>
+        </>
       )}
+
+      {removing && (
+        <Confirm
+          title="Strafschop verwijderen?"
+          body={`${removing.name} (${removing.scored ? 'gescoord' : 'gemist'}) wordt uit de reeks verwijderd.`}
+          confirmLabel="Ja, verwijder"
+          danger
+          onConfirm={() => {
+            onRemove(removing.id)
+            setRemoving(null)
+          }}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
+
+      {/* Na de reeks is beëindigen de gewone volgende stap. */}
+      <div className="penalties-end">
+        <button className="btn btn-primary btn-end-match" onClick={onEnd}>
+          Beëindig wedstrijd
+        </button>
+      </div>
     </section>
   )
 }
@@ -1700,6 +1984,32 @@ function PauseIcon() {
   )
 }
 
+// Voetbal met een groen vinkje: strafschop gescoord. De ⚽ van het toestel
+// zelf is op dit formaat het best herkenbaar.
+function BallScoredIcon() {
+  return (
+    <span className="ball-scored" aria-hidden="true">
+      <span className="ball-scored-ball">⚽</span>
+      <span className="ball-scored-check">✓</span>
+    </span>
+  )
+}
+
+function FlagIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" focusable="false">
+      <path
+        d="M5 17.5V3m0 1h9l-2 3.25L14 10.5H5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function SwapIcon() {
   return (
     <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false">
@@ -1853,6 +2163,92 @@ function NumberSelect({ value, min, max, onChange, ...props }) {
   )
 }
 
+// Keuze voor de wisselmelding: uit, halverwege elke periode, of om de zoveel
+// minuten. Gebruikt bij de start van een match en tijdens de match.
+function SubChoice({ subMinutes, periodMinutes, onChange }) {
+  return (
+    <>
+      <div className="periods sub-choice">
+        <button
+          className={subMinutes === 0 ? 'per is-on' : 'per'}
+          onClick={() => onChange(0)}
+          aria-pressed={subMinutes === 0}
+        >
+          Uit
+        </button>
+        <button
+          className={subMinutes == null ? 'per is-on' : 'per'}
+          onClick={() => onChange(null)}
+          aria-pressed={subMinutes == null}
+        >
+          Halverwege
+        </button>
+        <button
+          className={subMinutes > 0 ? 'per is-on' : 'per'}
+          onClick={() => {
+            if (!(subMinutes > 0)) onChange(Math.max(1, Math.floor(periodMinutes / 3)))
+          }}
+          aria-pressed={subMinutes > 0}
+        >
+          Om de … min
+        </button>
+      </div>
+      {subMinutes > 0 && (
+        <label className="field-group sub-every">
+          <span className="field-group-label">Minuten tussen wissels</span>
+          <NumberSelect
+            min={1}
+            max={45}
+            value={subMinutes}
+            onChange={onChange}
+            aria-label="Minuten tussen wissels"
+          />
+        </label>
+      )}
+      <p className="sub-hint">
+        {subMinutes === 0
+          ? 'Geen wisselmelding tijdens de match.'
+          : subMinutes == null
+            ? `Melding op ${mmss(Math.floor((periodMinutes * 60) / 2))} in elke periode, met 30 seconden aftellen.`
+            : subMinutes >= periodMinutes
+              ? 'Langer dan een periode: er valt geen wisselmoment binnen de periode.'
+              : `Melding om de ${subMinutes} min in elke periode, met 30 seconden aftellen.`}
+      </p>
+    </>
+  )
+}
+
+function SubSettings({ subMinutes, periodMinutes, onSave, onCancel }) {
+  const panel = useRef(null)
+  const [value, setValue] = useState(subMinutes)
+  useModal(panel, onCancel)
+
+  return (
+    <div className="overlay" onClick={onCancel}>
+      <div
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sub-settings-title"
+        tabIndex={-1}
+        ref={panel}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="sub-settings-title">Wisselmelding</h2>
+        <SubChoice subMinutes={value} periodMinutes={periodMinutes} onChange={setValue} />
+        <div className="dialog-actions">
+          <button className="btn" onClick={onCancel}>
+            Annuleer
+          </button>
+          <button className="btn btn-primary" onClick={() => onSave(value)}>
+            Bewaar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
   const panel = useRef(null)
   const [teamId, setTeamId] = useState(defaultTeamId)
@@ -1903,35 +2299,7 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
       activePlayerIds,
     })
 
-  useEffect(() => {
-    panel.current?.focus()
-    const onKey = (e) => {
-      if (e.key === 'Escape') {
-        onCancel()
-        return
-      }
-      if (e.key !== 'Tab') return
-      // Houd de focus binnen het venster zolang het openstaat.
-      const focusable = panel.current?.querySelectorAll('button, input, a[href]') ?? []
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    const scroll = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = scroll
-    }
-  }, [onCancel])
+  useModal(panel, onCancel)
 
   return (
     <div className="overlay" onClick={onCancel}>
@@ -2028,52 +2396,11 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
 
         <div className="panel-card">
           <span className="choice-label">Wisselmelding</span>
-          <div className="periods sub-choice">
-            <button
-              className={subMinutes === 0 ? 'per is-on' : 'per'}
-              onClick={() => setSubMinutes(0)}
-              aria-pressed={subMinutes === 0}
-            >
-              Uit
-            </button>
-            <button
-              className={subMinutes == null ? 'per is-on' : 'per'}
-              onClick={() => setSubMinutes(null)}
-              aria-pressed={subMinutes == null}
-            >
-              Halverwege
-            </button>
-            <button
-              className={subMinutes > 0 ? 'per is-on' : 'per'}
-              onClick={() => {
-                if (!(subMinutes > 0)) setSubMinutes(Math.max(1, Math.floor(periodMinutes / 3)))
-              }}
-              aria-pressed={subMinutes > 0}
-            >
-              Om de … min
-            </button>
-          </div>
-          {subMinutes > 0 && (
-            <label className="field-group sub-every">
-              <span className="field-group-label">Minuten tussen wissels</span>
-              <NumberSelect
-                min={1}
-                max={45}
-                value={subMinutes}
-                onChange={setSubMinutes}
-                aria-label="Minuten tussen wissels"
-              />
-            </label>
-          )}
-          <p className="sub-hint">
-            {subMinutes === 0
-              ? 'Geen wisselmelding tijdens de match.'
-              : subMinutes == null
-                ? `Melding op ${mmss(Math.floor((periodMinutes * 60) / 2))} in elke periode, met 30 seconden aftellen.`
-                : subMinutes >= periodMinutes
-                  ? 'Langer dan een periode: er valt geen wisselmoment binnen de periode.'
-                  : `Melding om de ${subMinutes} min in elke periode, met 30 seconden aftellen.`}
-          </p>
+          <SubChoice
+            subMinutes={subMinutes}
+            periodMinutes={periodMinutes}
+            onChange={setSubMinutes}
+          />
         </div>
 
         <div className="panel-card">
