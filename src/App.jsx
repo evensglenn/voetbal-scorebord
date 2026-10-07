@@ -1834,10 +1834,23 @@ function InfoIcon() {
   )
 }
 
-const clampNumber = (value, min, max) => {
-  const n = Math.round(Number(value))
-  if (!Number.isFinite(n)) return min
-  return Math.min(max, Math.max(min, n))
+// Keuzelijst voor een getal: op een gsm opent dat het scrollwiel of de
+// scrollbare lijst van het toestel, in plaats van een toetsenbord.
+function NumberSelect({ value, min, max, onChange, ...props }) {
+  return (
+    <select
+      {...props}
+      className="field"
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+    >
+      {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((n) => (
+        <option key={n} value={n}>
+          {n}
+        </option>
+      ))}
+    </select>
+  )
 }
 
 function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
@@ -1987,27 +2000,21 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
           <div className="row row-flush">
             <label className="field-group">
               <span className="field-group-label">Periodes</span>
-              <input
-                className="field"
-                type="number"
-                inputMode="numeric"
-                min="1"
-                max="12"
+              <NumberSelect
+                min={1}
+                max={12}
                 value={periodsCount}
-                onChange={(e) => setPeriodsCount(clampNumber(e.target.value, 1, 12))}
+                onChange={setPeriodsCount}
                 aria-label="Aantal periodes"
               />
             </label>
             <label className="field-group">
               <span className="field-group-label">Minuten per periode</span>
-              <input
-                className="field"
-                type="number"
-                inputMode="numeric"
-                min="1"
-                max="90"
+              <NumberSelect
+                min={1}
+                max={45}
                 value={periodMinutes}
-                onChange={(e) => setPeriodMinutes(clampNumber(e.target.value, 1, 90))}
+                onChange={setPeriodMinutes}
                 aria-label="Minuten per periode"
               />
             </label>
@@ -2049,14 +2056,11 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
           {subMinutes > 0 && (
             <label className="field-group sub-every">
               <span className="field-group-label">Minuten tussen wissels</span>
-              <input
-                className="field"
-                type="number"
-                inputMode="numeric"
-                min="1"
-                max="90"
+              <NumberSelect
+                min={1}
+                max={45}
                 value={subMinutes}
-                onChange={(e) => setSubMinutes(clampNumber(e.target.value, 1, 90))}
+                onChange={setSubMinutes}
                 aria-label="Minuten tussen wissels"
               />
             </label>
