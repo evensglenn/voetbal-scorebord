@@ -1248,7 +1248,6 @@ export default function App() {
             team={match}
             onStart={() => setStartingMatch(true)}
             onOpenSquad={() => setScreen('squad')}
-            onSettings={toggleSettings}
           />
         )
       ) : screen === 'squad' ? (
@@ -1300,12 +1299,6 @@ export default function App() {
         />
       ) : (
         <Stats teams={state.teams} history={state.history} defaultTeamId={state.activeTeamId} />
-      )}
-
-      {/* Overal onderaan dezelfde ingang naar Instellingen; op het startscherm
-          zit hij in de hero. */}
-      {screen !== 'settings' && !(screen === 'match' && !match.started) && (
-        <SettingsLink onClick={toggleSettings} />
       )}
 
 
@@ -2379,16 +2372,6 @@ function Squad({
   )
 }
 
-// Ingang naar Instellingen, onderaan elk scherm.
-function SettingsLink({ onClick }) {
-  return (
-    <button className="settings-link" onClick={onClick}>
-      <GearIcon />
-      Instellingen
-    </button>
-  )
-}
-
 function Settings({
   theme,
   onTheme,
@@ -2641,7 +2624,7 @@ function Backup({ state, restoreBlocked, onRestore, autoBackup, onAutoBackup }) 
 
 // Startscherm zolang er geen wedstrijd bezig is: titel, ploeg en een
 // duidelijke aftrapknop in één vlak.
-function Home({ team, onStart, onOpenSquad, onSettings }) {
+function Home({ team, onStart, onOpenSquad }) {
   const cfg = AGE_CONFIG[team.ageGroup] ?? AGE_CONFIG.U9
 
   return (
@@ -2680,7 +2663,6 @@ function Home({ team, onStart, onOpenSquad, onSettings }) {
             Voeg eerst spelers toe →
           </button>
         )}
-        <SettingsLink onClick={onSettings} />
       </section>
     </div>
   )

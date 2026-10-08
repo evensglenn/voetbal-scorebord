@@ -277,19 +277,39 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.15rem;
   min-height: 3.25rem;
   background: none;
   border: 0;
   border-radius: 9px;
   padding: 0.3rem 0.2rem;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.1;
   text-align: center;
   color: var(--muted);
   cursor: pointer;
+  transition: background 180ms ease, color 180ms ease;
+}
+
+.tab svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Enkel iconen; het label verschijnt alleen onder de actieve tab. Het blijft
+   wel in de DOM (niet display: none), zodat schermlezers het voorlezen. */
+.tab > span {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 200ms ease, opacity 160ms ease, margin 200ms ease;
+}
+
+.tab.is-on > span {
+  max-height: 1.2em;
+  margin-top: 0.15rem;
+  opacity: 1;
 }
 
 .tab.is-on {
@@ -1061,37 +1081,6 @@ body {
   width: 2.5rem;
   min-height: 2.5rem;
   border: 0;
-}
-
-.settings-link {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 2rem auto 0;
-  flex: 0 0 auto;
-  min-height: 2.75rem;
-  padding: 0 0.9rem;
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font: inherit;
-  font-size: 0.85rem;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.settings-link svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* In de donkere hero van het startscherm. */
-.home-hero > .settings-link {
-  margin-top: 2.6rem;
-  /* Dekkend, zodat de lijnen van het veld er niet door schemeren. */
-  background: var(--bar);
-  border-color: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.55);
 }
 
 .settings-head {
@@ -2204,7 +2193,7 @@ input:focus-visible {
      vormen één vlak; onderaan blijft ruimte vrij voor de tabbalk, plus wat
      lucht zodat de startknop niet tegen de tabbalk zit. */
   padding: calc(1.35rem + env(safe-area-inset-top, 0px)) 1.25rem
-    calc(4.9rem + env(safe-area-inset-bottom, 0px));
+    calc(10.25rem + env(safe-area-inset-bottom, 0px));
   min-height: 100svh;
   background:
     radial-gradient(85% 45% at 50% 50%, rgba(228, 96, 10, 0.24), transparent 70%),
@@ -2324,6 +2313,8 @@ input:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .btn-start-hero,
+  .tab,
+  .tab > span,
   .switch,
   .switch::after {
     transition: none;
@@ -2344,7 +2335,6 @@ input:focus-visible {
 
   .board,
   .tabs,
-  .settings-link,
   .pane-settings,
   .pane-squad,
   .pane-history,
