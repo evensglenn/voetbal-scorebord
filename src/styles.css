@@ -1719,6 +1719,348 @@ input:focus-visible {
 }
 
 
+/* Groot scorebord: enkel zichtbaar als de gsm tijdens een wedstrijd
+   gekanteld wordt, om de stand aan andere ouders te tonen. Onder de
+   dialogen (z-index 10), zodat een venster dat openstaat zichtbaar blijft. */
+.bigboard {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-height: 32rem) {
+  .bigboard {
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    padding: 1rem calc(1.5rem + env(safe-area-inset-right, 0px)) 1rem
+      calc(1.5rem + env(safe-area-inset-left, 0px));
+    background:
+      radial-gradient(60% 90% at 50% 55%, rgba(228, 96, 10, 0.22), transparent 70%),
+      var(--bar);
+    color: var(--on-bar);
+    animation: overlay-in 200ms ease-out;
+  }
+}
+
+.bigboard-row {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+}
+
+.bigboard-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.bigboard-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(1.2rem, 7vh, 2.2rem);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bigboard-name.is-ours,
+.bigboard-goals.is-ours {
+  color: var(--club);
+}
+
+.bigboard-goals {
+  font-size: clamp(5rem, 52vh, 15rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+
+/* Melding tussen de scores. */
+.bigboard-notice {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 34%;
+  padding: 0.7rem 1.1rem;
+  background: rgba(17, 22, 27, 0.75);
+  border: 1px solid rgba(228, 96, 10, 0.45);
+  border-radius: 1rem;
+  font: inherit;
+  font-size: clamp(0.95rem, 5vh, 1.4rem);
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.85);
+  animation: bb-notice-in 360ms cubic-bezier(0.2, 1.35, 0.4, 1);
+}
+
+.bigboard-notice strong {
+  font-size: 1.6em;
+  font-weight: 700;
+  color: var(--on-bar);
+}
+
+.bigboard-notice svg {
+  width: 1.6em;
+  height: 1.6em;
+}
+
+.bigboard-notice.is-now {
+  background: var(--club);
+  border-color: var(--club);
+  color: var(--on-accent);
+  cursor: pointer;
+  animation:
+    bb-notice-in 360ms cubic-bezier(0.2, 1.35, 0.4, 1),
+    bb-notice-pulse 1.1s ease-in-out 360ms infinite;
+}
+
+.bigboard-notice.is-over {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.bigboard-notice.is-over strong {
+  font-size: 1.15em;
+}
+
+@keyframes bb-notice-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+}
+
+@keyframes bb-notice-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 0 0 rgba(228, 96, 10, 0.55);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.06);
+    box-shadow: 0 0 0 0.9rem rgba(228, 96, 10, 0);
+  }
+}
+
+.bigboard-meta {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+  font-size: clamp(1.4rem, 11vh, 3.2rem);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Digitale klok (zeven segmenten), schuin zoals een echt LED-display. */
+.bigboard-clock {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6em;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  height: clamp(2.6rem, 15vh, 4.5rem);
+  font-size: clamp(2.6rem, 15vh, 4.5rem);
+}
+
+.bigboard-clock:disabled {
+  cursor: default;
+}
+
+.bigboard-clock:not(:disabled):active .seg-clock {
+  transform: skewX(-7deg) scale(0.96);
+}
+
+.seg-clock {
+  display: inline-flex;
+  gap: 0.09em;
+  height: 1em;
+  transform: skewX(-7deg);
+}
+
+.seg-digit {
+  height: 100%;
+  width: auto;
+}
+
+.seg-colon {
+  height: 100%;
+  width: auto;
+  margin: 0 -0.02em;
+}
+
+.seg {
+  fill: rgba(255, 255, 255, 0.06);
+}
+
+.seg.is-on {
+  fill: #e6e9ec;
+  filter: drop-shadow(0 0 0.05em rgba(255, 255, 255, 0.45));
+}
+
+/* Loopt de klok, dan knippert het dubbelpunt; staat hij stil, dan dimt en
+   pulseert de hele klok traag. */
+.bigboard-clock.is-running .seg-colon .seg {
+  animation: colon-blink 1s steps(1, end) infinite;
+}
+
+.bigboard-clock:not(.is-running) .seg-clock {
+  animation: clock-paused 1.6s ease-in-out infinite;
+}
+
+@keyframes colon-blink {
+  50% {
+    fill: rgba(255, 255, 255, 0.06);
+    filter: none;
+  }
+}
+
+@keyframes clock-paused {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Extra tijd: kleiner, naast de klok. */
+.bigboard-extra {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.12em;
+  height: 1em;
+  font-size: 0.5em;
+}
+
+.bigboard-extra-plus {
+  font-size: 0.9em;
+  font-weight: 700;
+  line-height: 0.8;
+  color: #e6e9ec;
+}
+
+.bigboard-progress {
+  position: relative;
+  z-index: 1;
+  width: min(70%, 32rem);
+  margin: clamp(0.5rem, 4vh, 1.25rem) auto 0;
+}
+
+.bigboard .period-progress {
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.bigboard .period-seg {
+  height: clamp(0.4rem, 2.2vh, 0.65rem);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.bigboard .period-seg.is-current {
+  background: rgba(228, 96, 10, 0.25);
+}
+
+/* Kantelen: het bord vervaagt binnen, het veld zakt op zijn plaats, de
+   cijfers vliegen van opzij binnen met een kleine veer, en namen en klok
+   schuiven trapsgewijs bij. Een element dat van display: none komt, speelt
+   zijn animatie opnieuw, dus dit gebeurt bij elke keer kantelen. */
+/* Het veld blijft hier op de achtergrond: de stand moet opvallen. */
+.bigboard .pitch {
+  opacity: 0.4;
+  animation: bb-pitch 600ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+.bigboard-name {
+  animation: bb-drop 420ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms backwards;
+}
+
+.bigboard-side:first-child .bigboard-goals {
+  animation: bb-from-left 620ms cubic-bezier(0.2, 1.35, 0.4, 1) 60ms backwards;
+}
+
+.bigboard-side:nth-child(2) .bigboard-goals {
+  animation: bb-from-right 620ms cubic-bezier(0.2, 1.35, 0.4, 1) 160ms backwards;
+}
+
+.bigboard-meta {
+  animation: bb-rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) 420ms backwards;
+}
+
+.bigboard-progress {
+  animation: bb-rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) 500ms backwards;
+}
+
+@keyframes bb-pitch {
+  from {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes bb-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-0.6em);
+  }
+}
+
+@keyframes bb-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-40%) scale(0.6) rotate(-8deg);
+  }
+}
+
+@keyframes bb-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(40%) scale(0.6) rotate(8deg);
+  }
+}
+
+@keyframes bb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bigboard,
+  .bigboard .pitch,
+  .bigboard-name,
+  .bigboard-goals,
+  .bigboard-notice,
+  .bigboard-meta,
+  .bigboard-progress,
+  .bigboard-clock .seg,
+  .bigboard-clock .seg-clock {
+    animation: none !important;
+  }
+}
+
 /* Bevestigingsvenster */
 .overlay {
   position: fixed;

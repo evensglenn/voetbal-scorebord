@@ -564,6 +564,7 @@ export default function App() {
     (match.runningSince ? Math.floor((Date.now() - match.runningSince) / 1000) : 0)
   const periodSeconds = match.periodMinutes * 60
   const extraSeconds = Math.max(0, clock - periodSeconds)
+  const periodProgress = periodSeconds > 0 ? Math.min(1, clock / periodSeconds) : 0
   // Enkel zolang de nieuwe periode nog niet begonnen is: daarna is
   // "Periode x gestart · Klok staat klaar" niet meer juist.
   const canUndoPeriod =
@@ -966,24 +967,7 @@ export default function App() {
             {/* Tijdens de strafschoppen spelen klok en periodes geen rol meer. */}
             {!penaltiesShown && (
               <section className="clockbar">
-                <div className="period-progress" aria-hidden="true">
-                  {PERIODS.map((p) => {
-                    const fill =
-                      p < match.period
-                        ? 1
-                        : p > match.period || periodSeconds <= 0
-                          ? 0
-                          : Math.min(1, clock / periodSeconds)
-                    return (
-                      <span
-                        key={p}
-                        className={p === match.period ? 'period-seg is-current' : 'period-seg'}
-                      >
-                        <span className="period-seg-fill" style={{ width: `${fill * 100}%` }} />
-                      </span>
-                    )
-                  })}
-                </div>
+                <PeriodProgress count={PERIODS.length} period={match.period} progress={periodProgress} />
                 <div className="clock">
                   <div className="clock-readout">
                     <span className="clock-label">Periode {match.period}</span>
@@ -1349,6 +1333,33 @@ export default function App() {
         />
       )}
 
+      {match.started && (
+        <BigBoard
+          home={match.home}
+          score={score}
+          opponentName={opponentName}
+          period={match.period}
+          clock={mmss(Math.min(clock, periodSeconds))}
+          extra={extraSeconds > 0 ? mmss(extraSeconds) : null}
+          running={running}
+          finished={matchFinished}
+          penalties={match.penalties}
+          periodsCount={PERIODS.length}
+          periodProgress={periodProgress}
+          notice={
+            periodOver
+              ? { kind: 'over', text: lastPeriod ? 'Laatste periode voorbij' : `Periode ${match.period} voorbij` }
+              : subPhase === 'now' && !subDismissed
+                ? { kind: 'now' }
+                : subPhase === 'soon' && !subDismissed
+                  ? { kind: 'soon', seconds: nextSub - clock }
+                  : null
+          }
+          onDismissSub={() => setDismissedSub(subKey)}
+          onStartClock={!running && !periodOver ? toggleClock : null}
+        />
+      )}
+
       {updateAvailable && (
         <div className="update-toast" role="status">
           <span>Nieuwe versie beschikbaar</span>
@@ -1602,6 +1613,178 @@ function HattrickBanner({ live, players }) {
 // scorebord en de startkaart. "slice" vult de breedte en snijdt boven en onder
 // af, zodat de lijnen niet vervormen of meeschalen wanneer de kop krimpt.
 // Staand (vertical) draait het veld een kwartslag voor hoge vlakken.
+// Eén segment per periode: afgelopen periodes vol, de huidige loopt mee met
+// de klok, de volgende nog leeg.
+function PeriodProgress({ count, period, progress }) {
+  return (
+    <div className="period-progress" aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => i + 1).map((p) => {
+        const fill = p < period ? 1 : p > period ? 0 : progress
+        return (
+          <span key={p} className={p === period ? 'period-seg is-current' : 'period-seg'}>
+            <span className="period-seg-fill" style={{ width: `${fill * 100}%` }} />
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+// Digitale klok met zeven segmenten per cijfer, zoals op een echt scorebord.
+// Niet-brandende segmenten blijven vaag zichtbaar; een lege voorloopplaats
+// (bv. " 6:00") toont enkel die vage segmenten.
+const SEGMENTS = {
+  a: [7, 5, 53, 5, 'h'],
+  b: [55, 7, 55, 48, 'v'],
+  c: [55, 52, 55, 93, 'v'],
+  d: [7, 95, 53, 95, 'h'],
+  e: [5, 52, 5, 93, 'v'],
+  f: [5, 7, 5, 48, 'v'],
+  g: [7, 50, 53, 50, 'h'],
+}
+const DIGIT_SEGMENTS = [
+  'abcdef', 'bc', 'abged', 'abgcd', 'fgbc', 'afgcd', 'afgedc', 'abc', 'abcdefg', 'abcdfg',
+]
+
+function segmentPoints([x1, y1, x2, y2, dir]) {
+  const t = 5 // halve dikte
+  return dir === 'h'
+    ? `${x1},${y1} ${x1 + t},${y1 - t} ${x2 - t},${y2 - t} ${x2},${y2} ${x2 - t},${y2 + t} ${x1 + t},${y1 + t}`
+    : `${x1},${y1} ${x1 + t},${y1 + t} ${x2 + t},${y2 - t} ${x2},${y2} ${x2 - t},${y2 - t} ${x1 - t},${y1 + t}`
+}
+
+function SegmentDigit({ char }) {
+  const lit = /\d/.test(char) ? DIGIT_SEGMENTS[Number(char)] : ''
+  return (
+    <svg className="seg-digit" viewBox="-2 -2 64 104" aria-hidden="true" focusable="false">
+      {Object.entries(SEGMENTS).map(([name, seg]) => (
+        <polygon
+          key={name}
+          className={lit.includes(name) ? 'seg is-on' : 'seg'}
+          points={segmentPoints(seg)}
+        />
+      ))}
+    </svg>
+  )
+}
+
+function SegmentClock({ time, pad = true }) {
+  const [min, sec] = time.split(':')
+  const chars = `${pad ? min.padStart(2, ' ') : min}:${sec}`
+  return (
+    <span className="seg-clock" role="img" aria-label={time}>
+      {[...chars].map((c, i) =>
+        c === ':' ? (
+          <svg key={i} className="seg-colon" viewBox="0 0 20 104" aria-hidden="true" focusable="false">
+            <circle className="seg is-on" cx="10" cy="32" r="5.5" />
+            <circle className="seg is-on" cx="10" cy="70" r="5.5" />
+          </svg>
+        ) : (
+          <SegmentDigit key={i} char={c} />
+        ),
+      )}
+    </span>
+  )
+}
+
+// Groot scorebord om aan de zijlijn te tonen: verschijnt enkel wanneer de
+// gsm tijdens een wedstrijd gekanteld wordt (zie de media query in de CSS).
+function BigBoard({
+  home,
+  score,
+  opponentName,
+  period,
+  clock,
+  extra,
+  running,
+  finished,
+  penalties,
+  periodsCount,
+  periodProgress,
+  notice,
+  onDismissSub,
+  onStartClock,
+}) {
+  const ours = { name: TEAM, goals: score.us, ours: true }
+  const theirs = { name: opponentName, goals: score.them, ours: false }
+  const [left, right] = home ? [ours, theirs] : [theirs, ours]
+  const pens = {
+    us: penalties.filter((p) => p.team === 'us' && p.scored).length,
+    them: penalties.filter((p) => p.team === 'them' && p.scored).length,
+  }
+  const [penLeft, penRight] = home ? [pens.us, pens.them] : [pens.them, pens.us]
+
+  return createPortal(
+    <div className="bigboard">
+      <Pitch />
+      <div className="bigboard-row">
+        {[left, right].map((side, i) => (
+          <div key={i} className="bigboard-side">
+            <span className={side.ours ? 'bigboard-name is-ours' : 'bigboard-name'}>
+              {side.name}
+            </span>
+            <span className={side.ours ? 'bigboard-goals is-ours' : 'bigboard-goals'}>
+              {side.goals}
+            </span>
+          </div>
+        ))}
+        {/* Tussen de scores: een wissel- of eindemelding, anders niets. */}
+        {notice?.kind === 'now' ? (
+          <button
+            key="now"
+            className="bigboard-notice is-now"
+            onClick={onDismissSub}
+            aria-label="Verberg wisselmelding"
+          >
+            <SwapIcon />
+            <strong>Wisselen!</strong>
+          </button>
+        ) : notice?.kind === 'soon' ? (
+          <div key="soon" className="bigboard-notice" role="status">
+            <span>Wissel over</span>
+            <strong>{notice.seconds}s</strong>
+          </div>
+        ) : notice?.kind === 'over' ? (
+          <div key="over" className="bigboard-notice is-over" role="status">
+            <FlagIcon />
+            <strong>{notice.text}</strong>
+          </div>
+        ) : null}
+      </div>
+      <div className="bigboard-meta">
+        {penalties.length > 0 ? (
+          <span>
+            Strafschoppen {penLeft}–{penRight}
+          </span>
+        ) : finished ? (
+          <span>Einde wedstrijd</span>
+        ) : (
+          // Tik op de stilstaande klok om te starten; stoppen kan hier niet,
+          // zodat niemand de klok per ongeluk stillegt.
+          <button
+            className={running ? 'bigboard-clock is-running' : 'bigboard-clock'}
+            onClick={onStartClock ?? undefined}
+            disabled={!onStartClock}
+            aria-label={onStartClock ? 'Start de klok' : undefined}
+          >
+            <SegmentClock time={clock} />
+            {extra && (
+              <span className="bigboard-extra">
+                <span className="bigboard-extra-plus">+</span>
+                <SegmentClock time={extra} pad={false} />
+              </span>
+            )}
+          </button>
+        )}
+      </div>
+      <div className="bigboard-progress">
+        <PeriodProgress count={periodsCount} period={period} progress={periodProgress} />
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 function Pitch({ vertical = false }) {
   return (
     <svg
