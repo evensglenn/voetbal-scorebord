@@ -217,6 +217,10 @@ function fromStored(parsed) {
   return { teams: [legacy], activeTeamId: legacy.id, history }
 }
 
+// "Ploeg" zolang er maar één is (bv. ouders van één voetballend kind),
+// "Ploegen" vanaf de tweede.
+const teamsLabel = (teams) => (teams.length > 1 ? 'Ploegen' : 'Ploeg')
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -439,6 +443,7 @@ export default function App() {
   // daar niet doorlopen.
   const running = match.runningSince != null
   const [screen, setScreen] = useState('match')
+  const squadLabel = teamsLabel(state.teams)
   const [startingMatch, setStartingMatch] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [ending, setEnding] = useState(false)
@@ -954,7 +959,7 @@ export default function App() {
           aria-current={screen === 'squad' ? 'page' : undefined}
         >
           <TeamIcon />
-          <span>Ploegen</span>
+          <span>{squadLabel}</span>
         </button>
         <button
           className={screen === 'history' ? 'tab is-on' : 'tab'}
@@ -1130,7 +1135,7 @@ export default function App() {
             <h2 className="section-title">Wie scoorde?</h2>
             {match.players.length === 0 ? (
               <p className="empty">
-                Nog geen spelers. Voeg ze toe bij <strong>Ploegen</strong> en tik hier daarna
+                Nog geen spelers. Voeg ze toe bij <strong>{squadLabel}</strong> en tik hier daarna
                 op de naam van de scorer.
               </p>
             ) : (
@@ -2225,7 +2230,7 @@ function Squad({
 
   return (
     <section className="pane-squad">
-      <h2 className="section-title">Ploegen</h2>
+      <h2 className="section-title">{teamsLabel(teams)}</h2>
 
       <div className="team-switch">
         {teams.map((t) => {
@@ -2759,18 +2764,21 @@ function Stats({ teams, history, defaultTeamId }) {
   return (
     <section className="pane-stats">
       <h2 className="section-title">Statistieken</h2>
-      <div className="team-switch">
-        {teams.map((t) => (
-          <button
-            key={t.id}
-            className={t.id === team.id ? 'team-chip is-on' : 'team-chip'}
-            onClick={() => setTeamId(t.id)}
-            aria-pressed={t.id === team.id}
-          >
-            {t.ageGroup}
-          </button>
-        ))}
-      </div>
+      {/* Ploegkeuze enkel als er iets te kiezen valt, net als bij Uitslagen. */}
+      {teams.length > 1 && (
+        <div className="team-switch">
+          {teams.map((t) => (
+            <button
+              key={t.id}
+              className={t.id === team.id ? 'team-chip is-on' : 'team-chip'}
+              onClick={() => setTeamId(t.id)}
+              aria-pressed={t.id === team.id}
+            >
+              {t.ageGroup}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Bij een andere ploeg komt alles opnieuw binnen. */}
       <div key={team.id}>
@@ -2969,6 +2977,18 @@ function Stats({ teams, history, defaultTeamId }) {
   )
 }
 
+// Korte datum voor de lijst ("za 4 okt 2026"); oudere uitslagen zonder
+// tijdstip tonen de bewaarde, voluit geschreven datum.
+const shortDate = (h) =>
+  h.finishedAt
+    ? new Date(h.finishedAt).toLocaleDateString('nl-BE', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : h.date
+
 function History({ teams, history, onView, onDelete }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null)
   const [teamId, setTeamId] = useState(null)
@@ -3020,16 +3040,29 @@ function History({ teams, history, onView, onDelete }) {
                   >
                     {resultOf(h)}
                   </span>
+                  {/* Vaste kolom: het streepje staat in elke rij op dezelfde plek. */}
                   <span className="history-item-score">
-                    <span className={h.left.ours ? 'is-ours' : ''}>{h.left.goals}</span>
-                    <span className="history-item-dash">–</span>
-                    <span className={h.right.ours ? 'is-ours' : ''}>{h.right.goals}</span>
+                    <span className="history-item-goals">
+                      <span className={h.left.ours ? 'is-ours' : ''}>{h.left.goals}</span>
+                      <span className="history-item-dash">–</span>
+                      <span className={h.right.ours ? 'is-ours' : ''}>{h.right.goals}</span>
+                    </span>
+                    {h.penalties && (
+                      <span className="history-item-pens">
+                        pen.{' '}
+                        {h.left.ours
+                          ? `${h.penalties.us.scored}–${h.penalties.them.scored}`
+                          : `${h.penalties.them.scored}–${h.penalties.us.scored}`}
+                      </span>
+                    )}
                   </span>
                   <span className="history-item-info">
                     <span className="history-item-opponent">{h.theirName}</span>
                     <span className="history-item-meta">
                       <span className="age-chip">{h.ageGroup}</span>
-                      {h.date}
+                      <span>{h.left.ours ? 'Thuis' : 'Uit'}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{shortDate(h)}</span>
                     </span>
                   </span>
                 </button>
@@ -3655,7 +3688,7 @@ function StartMatch({ teams, defaultTeamId, onStart, onCancel }) {
               )}
             </StartStep>
             {team.players.length === 0 ? (
-              <p className="start-note">Voeg eerst spelers toe bij Ploegen.</p>
+              <p className="start-note">Voeg eerst spelers toe bij {teamsLabel(teams)}.</p>
             ) : (
               <div className="player-select">
                 {team.players.map((p) => {
