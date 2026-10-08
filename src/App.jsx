@@ -57,9 +57,20 @@ const FORMAT_RULES_URL = {
 const SUB_COUNTDOWN = 30
 const SUB_NOTICE = 20
 
+// Gesproken meldingen staan standaard aan; uitzetten kan in Instellingen.
+const SPEECH_KEY = 'scorebord-speech'
+function speechEnabled() {
+  try {
+    return localStorage.getItem(SPEECH_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
 // Spreekt een korte melding uit via de spraak van het toestel (Nederlandse
 // stem als die er is). Loopt enkel zolang de app op het scherm staat.
-function say(text) {
+function say(text, { force = false } = {}) {
+  if (!force && !speechEnabled()) return
   const synth = window.speechSynthesis
   if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return
   const utterance = new SpeechSynthesisUtterance(text)
@@ -447,6 +458,19 @@ export default function App() {
   const [compactBoard, setCompactBoard] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [theme, setTheme] = useState(loadTheme)
+  const [speech, setSpeech] = useState(speechEnabled)
+  const changeSpeech = (on) => {
+    try {
+      if (on) localStorage.removeItem(SPEECH_KEY)
+      else localStorage.setItem(SPEECH_KEY, 'off')
+    } catch {
+      // opslag geweigerd; de keuze geldt dan niet na herladen
+    }
+    setSpeech(on)
+    // Meteen laten horen hoe het klinkt (en iOS ontgrendelen vanuit de tik).
+    if (on) say('Gesproken meldingen staan aan', { force: true })
+    else window.speechSynthesis?.cancel()
+  }
   const [autoBackup, setAutoBackup] = useState(() => {
     try {
       return localStorage.getItem(AUTO_BACKUP_KEY) === '1'
@@ -1262,6 +1286,8 @@ export default function App() {
           onRestore={setState}
           autoBackup={autoBackup}
           onAutoBackup={setAutoBackup}
+          speech={speech}
+          onSpeech={changeSpeech}
           onBack={toggleSettings}
         />
       ) : (
@@ -2263,7 +2289,7 @@ function Squad({
       )}
 
       <h2 className="section-title">Spelers</h2>
-      <div className="panel-card">
+      <div className="panel-card squad-add">
         <div className="row row-flush">
           <input
             className="field"
@@ -2363,6 +2389,8 @@ function Settings({
   onRestore,
   autoBackup,
   onAutoBackup,
+  speech,
+  onSpeech,
   onBack,
 }) {
   return (
@@ -2398,6 +2426,16 @@ function Settings({
         </p>
       </div>
 
+      <h2 className="section-title">Meldingen</h2>
+      <div className="panel-card">
+        <SwitchRow
+          checked={speech}
+          onChange={onSpeech}
+          label="Gesproken meldingen"
+          sub="De app zegt hardop wanneer er gewisseld moet worden en wanneer een periode voorbij is."
+        />
+      </div>
+
       <h2 className="section-title">Back-up</h2>
       <Backup
         state={state}
@@ -2413,6 +2451,23 @@ function Settings({
         <span className="settings-version">v{APP_VERSION}</span>
       </div>
     </section>
+  )
+}
+
+function SwitchRow({ checked, onChange, label, sub, className }) {
+  return (
+    <button
+      className={className ? `switch-row ${className}` : 'switch-row'}
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="switch-text">
+        <span>{label}</span>
+        {sub && <span className="switch-sub">{sub}</span>}
+      </span>
+      <span className={checked ? 'switch is-on' : 'switch'} aria-hidden="true" />
+    </button>
   )
 }
 
@@ -2537,20 +2592,13 @@ function Backup({ state, restoreBlocked, onRestore, autoBackup, onAutoBackup }) 
         {restoreBlocked && (
           <p className="backup-note">Terugzetten kan pas na de lopende wedstrijd.</p>
         )}
-        <button
-          className="switch-row"
-          role="switch"
-          aria-checked={autoBackup}
-          onClick={() => onAutoBackup(!autoBackup)}
-        >
-          <span className="switch-text">
-            <span>Na elke wedstrijd</span>
-            <span className="switch-sub">
-              Maak automatisch een back-up wanneer je een wedstrijd beëindigt.
-            </span>
-          </span>
-          <span className={autoBackup ? 'switch is-on' : 'switch'} aria-hidden="true" />
-        </button>
+        <SwitchRow
+          className="switch-row-split"
+          checked={autoBackup}
+          onChange={onAutoBackup}
+          label="Na elke wedstrijd"
+          sub="Maak automatisch een back-up wanneer je een wedstrijd beëindigt."
+        />
         {message && (
           <p className={message.error ? 'backup-note is-error' : 'backup-note'} role="status">
             {message.text}

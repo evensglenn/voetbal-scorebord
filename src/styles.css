@@ -1155,16 +1155,21 @@ body {
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  margin-top: 0.85rem;
-  padding: 0.85rem 0 0;
+  padding: 0;
   background: none;
   border: 0;
-  border-top: 1px solid var(--line-soft);
   font: inherit;
   font-size: 0.95rem;
   text-align: left;
   color: var(--ink);
   cursor: pointer;
+}
+
+/* Onder andere inhoud in hetzelfde blok: met een scheidingslijn erboven. */
+.switch-row-split {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line-soft);
 }
 
 .switch-text {
@@ -1523,6 +1528,26 @@ input:focus-visible {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+}
+
+/* Toevoegblokje even hoog als een spelersrij: het blokje zelf is het veld,
+   zodat "Naam" uitlijnt met de namen eronder. */
+.panel-card.squad-add {
+  padding: 0.45rem 0.75rem 0.45rem 0.85rem;
+}
+
+.squad-add .field {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  font-size: 1.1rem;
+  outline: none;
+}
+
+.squad-add:focus-within {
+  border-color: var(--club);
+  box-shadow: 0 0 0 3px rgba(228, 96, 10, 0.15);
 }
 
 .squad-name {
