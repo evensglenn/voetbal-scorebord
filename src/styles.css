@@ -1788,17 +1788,22 @@ input:focus-visible {
 }
 
 /* Gsm waarvan de schermstand niet om te zetten is: het bord liggend tekenen
-   in een rechtop staand scherm, zodat je de gsm gewoon dwars houdt. */
-.bigboard.is-rotated {
-  --bbh: 1vw;
-  --bbmax: 1;
-  inset: auto;
-  top: 0;
-  left: 100vw;
-  width: 100vh;
-  height: 100vw;
-  transform: rotate(90deg);
-  transform-origin: top left;
+   in een rechtop staand scherm, zodat je de gsm gewoon dwars houdt. Enkel
+   zolang het scherm ook echt rechtop staat: draait het (weer) mee naar
+   liggend, bv. na het aanzetten van automatisch draaien, dan is het bord
+   vanzelf liggend en zou draaien het net verticaal zetten. */
+@media (orientation: portrait) {
+  .bigboard.is-rotated {
+    --bbh: 1vw;
+    --bbmax: 1;
+    inset: auto;
+    top: 0;
+    left: 100vw;
+    width: 100vh;
+    height: 100vw;
+    transform: rotate(90deg);
+    transform-origin: top left;
+  }
 }
 
 /* Knopje net onder de middencirkel van het veld in het scorebord. Het veld
