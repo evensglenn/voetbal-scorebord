@@ -1379,22 +1379,27 @@ input:focus-visible {
 
 .match-links {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  gap: 0.6rem;
   margin-top: 1rem;
   padding: 0 1rem;
 }
 
-.btn-cancel-match {
-  min-height: 2.75rem;
-  padding: 0 0.75rem;
-  background: none;
-  border: 0;
-  font: inherit;
-  font-size: 0.9rem;
-  color: var(--muted);
-  text-decoration: underline;
-  cursor: pointer;
+/* Wedstrijdacties onderaan: rustige knoppen, zoals "Verwijder deze ploeg". */
+.match-link {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding-right: 0.6rem;
+  padding-left: 0.6rem;
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.match-link svg {
+  flex: 0 0 auto;
 }
 
 .scorer:active .tally {
