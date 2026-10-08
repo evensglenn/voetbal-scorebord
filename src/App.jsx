@@ -982,6 +982,14 @@ export default function App() {
           <StatsIcon />
           <span>Statistieken</span>
         </button>
+        <button
+          className={screen === 'settings' ? 'tab is-on' : 'tab'}
+          onClick={() => screen !== 'settings' && toggleSettings()}
+          aria-current={screen === 'settings' ? 'page' : undefined}
+        >
+          <GearIcon />
+          <span>Instellingen</span>
+        </button>
       </nav>
 
       {screen === 'match' ? (
