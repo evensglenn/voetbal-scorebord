@@ -1941,21 +1941,11 @@ input:focus-visible {
   filter: drop-shadow(0 0 0.05em rgba(255, 255, 255, 0.45));
 }
 
-/* Loopt de klok, dan knippert het dubbelpunt; staat hij stil, dan dimt en
-   pulseert de hele klok traag. */
-.bigboard-clock.is-running .seg-colon .seg {
-  animation: colon-blink 1s steps(1, end) infinite;
-}
-
-.bigboard-clock:not(.is-running) .seg-clock {
+/* Het dubbelpunt knippert via de klok zelf (zie SegmentClock). Staat de
+   klok stil, dan dimt en pulseert het geheel traag, als één blok, zodat de
+   klok en de extra tijd gelijk lopen. */
+.bigboard-clock:not(.is-running) {
   animation: clock-paused 1.6s ease-in-out infinite;
-}
-
-@keyframes colon-blink {
-  50% {
-    fill: rgba(255, 255, 255, 0.06);
-    filter: none;
-  }
 }
 
 @keyframes clock-paused {
@@ -2078,8 +2068,7 @@ input:focus-visible {
   .bigboard-notice,
   .bigboard-meta,
   .bigboard-progress,
-  .bigboard-clock .seg,
-  .bigboard-clock .seg-clock {
+  .bigboard-clock {
     animation: none !important;
   }
 }

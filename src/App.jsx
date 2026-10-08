@@ -541,19 +541,41 @@ export default function App() {
   // wordt herberekend) live meetelt. Bij terugkeer uit de achtergrond — waar
   // setInterval geen doorgang vindt — haalt visibilitychange/focus de
   // weergave meteen in, in plaats van tot de volgende seconde te wachten.
+  //
+  // Elke tik valt net na een volle (of halve) seconde sinds de start
+  // (runningSince), i.p.v. een vaste setInterval: zo verspringt de klok altijd
+  // precies één seconde, ook als een drukke gsm (of energiebesparing) de timer
+  // wat later laat afgaan. Met een vaste interval kon een tik net vóór en de
+  // volgende net na een secondegrens vallen, waardoor de klok twee seconden
+  // versprong. De halve seconden sturen het knipperende dubbelpunt.
   const [, forceTick] = useState(0)
+  const runningSince = match.runningSince
   useEffect(() => {
-    if (!running) return
+    if (!runningSince) return
     const bump = () => forceTick((n) => n + 1)
-    const id = setInterval(bump, 1000)
-    document.addEventListener('visibilitychange', bump)
-    window.addEventListener('focus', bump)
-    return () => {
-      clearInterval(id)
-      document.removeEventListener('visibilitychange', bump)
-      window.removeEventListener('focus', bump)
+    let id
+    const schedule = () => {
+      const intoHalf = (Date.now() - runningSince) % 500
+      id = setTimeout(() => {
+        bump()
+        schedule()
+      }, 500 - intoHalf + 15)
     }
-  }, [running])
+    schedule()
+    // Bij terugkeer uit de achtergrond meteen bijwerken en opnieuw uitlijnen.
+    const resync = () => {
+      clearTimeout(id)
+      bump()
+      schedule()
+    }
+    document.addEventListener('visibilitychange', resync)
+    window.addEventListener('focus', resync)
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('visibilitychange', resync)
+      window.removeEventListener('focus', resync)
+    }
+  }, [runningSince])
 
   // Zolang de klok loopt, houden we het scherm wakker: een webapp kan bij een
   // vergrendeld scherm niet meer trillen of spreken. Het systeem geeft die
@@ -1410,6 +1432,7 @@ export default function App() {
           }
           onDismissSub={() => setDismissedSub(subKey)}
           onStartClock={!running && !periodOver ? toggleClock : null}
+          colonOn={!running || (Date.now() - match.runningSince) % 1000 < 500}
         />
       )}
 
@@ -1721,7 +1744,9 @@ function SegmentDigit({ char }) {
   )
 }
 
-function SegmentClock({ time, pad = true }) {
+// colonOn komt van de klok zelf (aan in de eerste helft van elke seconde),
+// zodat alle dubbelpunten samen en in de maat van de seconden knipperen.
+function SegmentClock({ time, pad = true, colonOn = true }) {
   const [min, sec] = time.split(':')
   const chars = `${pad ? min.padStart(2, ' ') : min}:${sec}`
   return (
@@ -1729,8 +1754,8 @@ function SegmentClock({ time, pad = true }) {
       {[...chars].map((c, i) =>
         c === ':' ? (
           <svg key={i} className="seg-colon" viewBox="0 0 20 104" aria-hidden="true" focusable="false">
-            <circle className="seg is-on" cx="10" cy="32" r="5.5" />
-            <circle className="seg is-on" cx="10" cy="70" r="5.5" />
+            <circle className={colonOn ? 'seg is-on' : 'seg'} cx="10" cy="32" r="5.5" />
+            <circle className={colonOn ? 'seg is-on' : 'seg'} cx="10" cy="70" r="5.5" />
           </svg>
         ) : (
           <SegmentDigit key={i} char={c} />
@@ -1757,6 +1782,7 @@ function BigBoard({
   notice,
   onDismissSub,
   onStartClock,
+  colonOn,
 }) {
   const ours = { name: TEAM, goals: score.us, ours: true }
   const theirs = { name: opponentName, goals: score.them, ours: false }
@@ -1820,11 +1846,11 @@ function BigBoard({
             disabled={!onStartClock}
             aria-label={onStartClock ? 'Start de klok' : undefined}
           >
-            <SegmentClock time={clock} />
+            <SegmentClock time={clock} colonOn={colonOn} />
             {extra && (
               <span className="bigboard-extra">
                 <span className="bigboard-extra-plus">+</span>
-                <SegmentClock time={extra} pad={false} />
+                <SegmentClock time={extra} pad={false} colonOn={colonOn} />
               </span>
             )}
           </button>
