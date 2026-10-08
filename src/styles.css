@@ -1083,31 +1083,6 @@ body {
   border: 0;
 }
 
-.settings-head {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  margin: 1rem 1rem 0;
-}
-
-.settings-back {
-  justify-self: start;
-  padding: 0.4rem 0.2rem;
-  background: none;
-  border: 0;
-  font: inherit;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--club);
-  cursor: pointer;
-}
-
-.settings-title {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-
 .theme-seg {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

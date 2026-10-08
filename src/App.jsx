@@ -439,16 +439,6 @@ export default function App() {
   // daar niet doorlopen.
   const running = match.runningSince != null
   const [screen, setScreen] = useState('match')
-  // Instellingen is geen tab: onthoud waar je vandaan kwam om terug te keren.
-  const settingsBack = useRef('match')
-  const toggleSettings = () => {
-    if (screen === 'settings') {
-      setScreen(settingsBack.current)
-    } else {
-      settingsBack.current = screen
-      setScreen('settings')
-    }
-  }
   const [startingMatch, setStartingMatch] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [ending, setEnding] = useState(false)
@@ -940,8 +930,8 @@ export default function App() {
       )}
 
       <nav className="tabs">
-        {/* Tijdens een wedstrijd springt Live eruit; zolang de klok loopt,
-            pulseert het icoon. */}
+        {/* Zonder wedstrijd is dit "Start"; tijdens een wedstrijd wordt het
+            een rood "Live", en zolang de klok loopt pulseert het icoon. */}
         <button
           className={[
             'tab',
@@ -955,8 +945,8 @@ export default function App() {
           aria-current={screen === 'match' ? 'page' : undefined}
           aria-label={match.started ? 'Live – wedstrijd bezig' : undefined}
         >
-          <LiveIcon />
-          <span>Live</span>
+          {match.started ? <LiveIcon /> : <BallIcon />}
+          <span>{match.started ? 'Live' : 'Start'}</span>
         </button>
         <button
           className={screen === 'squad' ? 'tab is-on' : 'tab'}
@@ -984,7 +974,7 @@ export default function App() {
         </button>
         <button
           className={screen === 'settings' ? 'tab is-on' : 'tab'}
-          onClick={() => screen !== 'settings' && toggleSettings()}
+          onClick={() => setScreen('settings')}
           aria-current={screen === 'settings' ? 'page' : undefined}
         >
           <GearIcon />
@@ -1295,7 +1285,6 @@ export default function App() {
           onAutoBackup={setAutoBackup}
           speech={speech}
           onSpeech={changeSpeech}
-          onBack={toggleSettings}
         />
       ) : (
         <Stats teams={state.teams} history={state.history} defaultTeamId={state.activeTeamId} />
@@ -2382,17 +2371,9 @@ function Settings({
   onAutoBackup,
   speech,
   onSpeech,
-  onBack,
 }) {
   return (
     <section className="pane-settings">
-      <div className="settings-head">
-        <button className="settings-back" onClick={onBack}>
-          ← Terug
-        </button>
-        <h2 className="settings-title">Instellingen</h2>
-      </div>
-
       <h2 className="section-title">Weergave</h2>
       <div className="panel-card">
         <div className="theme-seg" role="group" aria-label="Thema">
@@ -3271,6 +3252,18 @@ function GearIcon() {
         strokeLinejoin="round"
       />
       <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function BallIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7l4.76 3.45-1.76 5.55H9l-1.76-5.55z" />
+        <path d="M12 7V3M15 16l2.5 3M16.76 10.45l3.74-1.45M9 16l-2.5 3M7.24 10.45L3.5 9" />
+      </g>
     </svg>
   )
 }
