@@ -1750,27 +1750,113 @@ input:focus-visible {
 /* Groot scorebord: enkel zichtbaar als de gsm tijdens een wedstrijd
    gekanteld wordt, om de stand aan andere ouders te tonen. Onder de
    dialogen (z-index 10), zodat een venster dat openstaat zichtbaar blijft. */
+/* Maten schalen met de hoogte van het bord (--bbh = 1% ervan). Gedraaid
+   getekend (gsm met vergrendelde stand) is dat de breedte van het scherm.
+   --bbmax rekt de bovengrenzen op voor grote schermen (tablet, computer). */
 .bigboard {
+  --bbh: 1vh;
+  --bbmax: 1;
+  position: fixed;
+  inset: 0;
+  z-index: 9;
   display: none;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  padding: 1rem calc(1.5rem + env(safe-area-inset-right, 0px)) 1rem
+    calc(1.5rem + env(safe-area-inset-left, 0px));
+  background:
+    radial-gradient(60% 90% at 50% 55%, rgba(228, 96, 10, 0.22), transparent 70%),
+    var(--bar);
+  color: var(--on-bar);
+  animation: overlay-in 200ms ease-out;
 }
 
 @media (orientation: landscape) and (max-height: 32rem) {
   .bigboard {
-    position: fixed;
-    inset: 0;
-    z-index: 9;
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    overflow: hidden;
-    padding: 1rem calc(1.5rem + env(safe-area-inset-right, 0px)) 1rem
-      calc(1.5rem + env(safe-area-inset-left, 0px));
-    background:
-      radial-gradient(60% 90% at 50% 55%, rgba(228, 96, 10, 0.22), transparent 70%),
-      var(--bar);
-    color: var(--on-bar);
-    animation: overlay-in 200ms ease-out;
   }
+}
+
+/* Zelf geopend met de knop (tablet, computer, of gsm zonder draaien). */
+.bigboard.is-open {
+  /* Op een rechtopstaand scherm (tablet) bepaalt de breedte hoe groot het
+     kan, anders worden de namen afgekapt. */
+  --bbh: min(1vh, 0.62vw);
+  --bbmax: 2.2;
+  display: flex;
+}
+
+/* Gsm waarvan de schermstand niet om te zetten is: het bord liggend tekenen
+   in een rechtop staand scherm, zodat je de gsm gewoon dwars houdt. */
+.bigboard.is-rotated {
+  --bbh: 1vw;
+  --bbmax: 1;
+  inset: auto;
+  top: 0;
+  left: 100vw;
+  width: 100vh;
+  height: 100vw;
+  transform: rotate(90deg);
+  transform-origin: top left;
+}
+
+/* Knopje net onder de middencirkel van het veld in het scorebord. Het veld
+   vult de breedte, dus de straal van de cirkel is 9,15/111 van de breedte;
+   een marge in % rekent ook met de breedte, en zo volgt het knopje de cirkel
+   op elke schermbreedte. */
+.board-expand {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  /* Icoon (18px, gecentreerd) begint zo een paar pixels onder de cirkel. */
+  margin-top: calc(8.243% - 7px);
+  padding: 0;
+  /* Geen rand of vlak: het veld eromheen is al kader genoeg. */
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transform: translateX(-50%);
+  transition: color 150ms ease;
+}
+
+.board-expand:hover {
+  color: var(--on-bar);
+}
+
+/* Ingeklapt scorebord: de cirkel valt er onder weg, dan in het midden. */
+.board.is-compact .board-expand {
+  margin-top: 0;
+  transform: translate(-50%, -50%);
+}
+
+.bigboard-close {
+  position: absolute;
+  z-index: 2;
+  top: calc(0.6rem + env(safe-area-inset-top, 0px));
+  right: calc(0.6rem + env(safe-area-inset-right, 0px));
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.bigboard-close svg {
+  width: 20px;
+  height: 20px;
 }
 
 .bigboard-row {
@@ -1791,7 +1877,7 @@ input:focus-visible {
 .bigboard-name {
   max-width: 100%;
   overflow: hidden;
-  font-size: clamp(1.2rem, 7vh, 2.2rem);
+  font-size: clamp(1.2rem, calc(7 * var(--bbh)), calc(2.2rem * var(--bbmax)));
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
   text-overflow: ellipsis;
@@ -1804,7 +1890,7 @@ input:focus-visible {
 }
 
 .bigboard-goals {
-  font-size: clamp(5rem, 52vh, 15rem);
+  font-size: clamp(5rem, calc(52 * var(--bbh)), calc(15rem * var(--bbmax)));
   font-weight: 700;
   line-height: 1;
 }
@@ -1826,7 +1912,7 @@ input:focus-visible {
   border: 1px solid rgba(228, 96, 10, 0.45);
   border-radius: 1rem;
   font: inherit;
-  font-size: clamp(0.95rem, 5vh, 1.4rem);
+  font-size: clamp(0.95rem, calc(5 * var(--bbh)), calc(1.4rem * var(--bbmax)));
   font-weight: 600;
   line-height: 1.15;
   text-align: center;
@@ -1890,7 +1976,7 @@ input:focus-visible {
   justify-content: center;
   gap: 0.6rem;
   margin-top: 0.25rem;
-  font-size: clamp(1.4rem, 11vh, 3.2rem);
+  font-size: clamp(1.4rem, calc(11 * var(--bbh)), calc(3.2rem * var(--bbmax)));
   font-weight: 600;
   color: rgba(255, 255, 255, 0.75);
 }
@@ -1907,8 +1993,8 @@ input:focus-visible {
   color: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  height: clamp(2.6rem, 15vh, 4.5rem);
-  font-size: clamp(2.6rem, 15vh, 4.5rem);
+  height: clamp(2.6rem, calc(15 * var(--bbh)), calc(4.5rem * var(--bbmax)));
+  font-size: clamp(2.6rem, calc(15 * var(--bbh)), calc(4.5rem * var(--bbmax)));
 }
 
 .bigboard-clock:disabled {
@@ -1983,7 +2069,7 @@ input:focus-visible {
   position: relative;
   z-index: 1;
   width: min(70%, 32rem);
-  margin: clamp(0.5rem, 4vh, 1.25rem) auto 0;
+  margin: clamp(0.5rem, calc(4 * var(--bbh)), calc(1.25rem * var(--bbmax))) auto 0;
 }
 
 .bigboard .period-progress {
@@ -1992,7 +2078,7 @@ input:focus-visible {
 }
 
 .bigboard .period-seg {
-  height: clamp(0.4rem, 2.2vh, 0.65rem);
+  height: clamp(0.4rem, calc(2.2 * var(--bbh)), calc(0.65rem * var(--bbmax)));
   background: rgba(255, 255, 255, 0.12);
 }
 

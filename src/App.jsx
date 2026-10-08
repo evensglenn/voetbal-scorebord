@@ -470,6 +470,62 @@ export default function App() {
   const [compactBoard, setCompactBoard] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [theme, setTheme] = useState(loadTheme)
+
+  // Groot scorebord zelf openen: altijd op tablet en computer, op een gsm
+  // enkel als automatisch draaien uit lijkt te staan (zie useAutoRotateOff).
+  const [device] = useState(deviceType)
+  const [bigOpen, setBigOpen] = useState(false)
+  const [bigRotated, setBigRotated] = useState(false)
+  const bigHold = useRef(false)
+  const autoRotateOff = useAutoRotateOff(device === 'phone' && match.started, bigHold)
+  const showBigButton = device !== 'phone' || autoRotateOff
+
+  const openBig = async () => {
+    setBigOpen(true)
+    bigHold.current = true
+    try {
+      await document.documentElement.requestFullscreen?.()
+    } catch {
+      // geen volledig scherm: het bord ligt toch al over alles heen
+    }
+    if (device !== 'phone') return
+    try {
+      await window.screen.orientation.lock('landscape')
+    } catch {
+      // stand niet te vergrendelen (bv. iPhone): het bord gedraaid tekenen
+      setBigRotated(true)
+    }
+  }
+
+  const closeBig = useCallback(() => {
+    setBigOpen(false)
+    setBigRotated(false)
+    bigHold.current = false
+    try {
+      window.screen.orientation?.unlock?.()
+    } catch {
+      // niets vergrendeld
+    }
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+  }, [])
+
+  // Esc, of het volledig scherm verlaten via de browser, sluit ook het bord.
+  useEffect(() => {
+    if (!bigOpen) return
+    const onKey = (e) => e.key === 'Escape' && closeBig()
+    const onFullscreen = () => !document.fullscreenElement && closeBig()
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('fullscreenchange', onFullscreen)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('fullscreenchange', onFullscreen)
+    }
+  }, [bigOpen, closeBig])
+
+  // Na de wedstrijd gaat het bord vanzelf dicht.
+  useEffect(() => {
+    if (!match.started && bigOpen) closeBig()
+  }, [match.started, bigOpen, closeBig])
   const [speech, setSpeech] = useState(speechEnabled)
   const [vibration, setVibration] = useState(vibrationEnabled)
   const changeVibration = (on) => {
@@ -823,6 +879,7 @@ export default function App() {
     if (!running) {
       unlockSpeech()
       askNotificationPermission()
+      if (device === 'phone') askMotionPermission()
     }
     // Opnieuw starten maakt een vroegtijdige stop ongedaan.
     setMatch((m) =>
@@ -983,6 +1040,7 @@ export default function App() {
           score={score}
           opponentName={opponentName}
           compact={compactBoard}
+          onOpenBig={showBigButton ? openBig : null}
         />
       )}
 
@@ -1435,6 +1493,9 @@ export default function App() {
           onDismissSub={() => setDismissedSub(subKey)}
           onStartClock={!running && !periodOver ? toggleClock : null}
           colonOn={!running || (Date.now() - match.runningSince) % 1000 < 500}
+          open={bigOpen}
+          rotated={bigRotated}
+          onClose={closeBig}
         />
       )}
 
@@ -1767,6 +1828,53 @@ function SegmentClock({ time, pad = true, colonOn = true }) {
   )
 }
 
+// Soort toestel: een computer heeft een muis (fijne aanwijzer); bij een
+// aanraakscherm beslist de kortste schermzijde tussen gsm en tablet.
+function deviceType() {
+  if (!window.matchMedia?.('(pointer: coarse)').matches) return 'pc'
+  return Math.min(window.screen.width, window.screen.height) < 600 ? 'phone' : 'tablet'
+}
+
+// iOS geeft de bewegingssensor pas vrij na toestemming vanuit een tik.
+function askMotionPermission() {
+  const ask = window.DeviceOrientationEvent?.requestPermission
+  if (typeof ask === 'function') ask.call(window.DeviceOrientationEvent).catch(() => {})
+}
+
+// Of automatisch draaien uit staat, kan een webapp niet uitlezen. We raden
+// het: houdt iemand de gsm een moment dwars (bewegingssensor) terwijl het
+// scherm rechtop blijft, dan draait het scherm dus niet mee. Draait het
+// scherm wel naar liggend, dan staat draaien aan.
+function useAutoRotateOff(active, holdRef) {
+  const [off, setOff] = useState(false)
+  useEffect(() => {
+    if (!active) return
+    const portrait = window.matchMedia('(orientation: portrait)')
+    let since = null
+    const onTilt = (e) => {
+      if (e.beta == null || e.gamma == null) return
+      const sideways = Math.abs(e.gamma) > 50 && Math.abs(e.beta) < 40
+      if (!sideways || !portrait.matches) {
+        since = null
+        return
+      }
+      since ??= Date.now()
+      if (Date.now() - since > 800) setOff(true)
+    }
+    const onTurn = () => {
+      // Zelf liggend gezet (groot scorebord) telt niet als automatisch draaien.
+      if (!portrait.matches && !holdRef.current) setOff(false)
+    }
+    window.addEventListener('deviceorientation', onTilt)
+    portrait.addEventListener?.('change', onTurn)
+    return () => {
+      window.removeEventListener('deviceorientation', onTilt)
+      portrait.removeEventListener?.('change', onTurn)
+    }
+  }, [active, holdRef])
+  return off
+}
+
 // Groot scorebord om aan de zijlijn te tonen: verschijnt enkel wanneer de
 // gsm tijdens een wedstrijd gekanteld wordt (zie de media query in de CSS).
 function BigBoard({
@@ -1785,6 +1893,9 @@ function BigBoard({
   onDismissSub,
   onStartClock,
   colonOn,
+  open,
+  rotated,
+  onClose,
 }) {
   const ours = { name: TEAM, goals: score.us, ours: true }
   const theirs = { name: opponentName, goals: score.them, ours: false }
@@ -1796,7 +1907,12 @@ function BigBoard({
   const [penLeft, penRight] = home ? [pens.us, pens.them] : [pens.them, pens.us]
 
   return createPortal(
-    <div className="bigboard">
+    <div className={['bigboard', open && 'is-open', rotated && 'is-rotated'].filter(Boolean).join(' ')}>
+      {open && (
+        <button className="bigboard-close" onClick={onClose} aria-label="Sluit groot scorebord">
+          <CloseIcon />
+        </button>
+      )}
       <Pitch />
       <div className="bigboard-row">
         {[left, right].map((side, i) => (
@@ -1895,7 +2011,7 @@ function Pitch({ vertical = false }) {
   )
 }
 
-function Scoreboard({ started, home, score, opponentName, compact }) {
+function Scoreboard({ started, home, score, opponentName, compact, onOpenBig }) {
   // Een cijfer "popt" enkel wanneer het verandert: door de key wordt het
   // element dan opnieuw aangemaakt, en enkel waarden die afwijken van de
   // stand bij het openen krijgen de animatie (dus niet bij elke tabwissel).
@@ -1926,6 +2042,17 @@ function Scoreboard({ started, home, score, opponentName, compact }) {
   return (
     <header className={compact ? 'board is-compact' : 'board'}>
       <Pitch />
+      {/* Klein, net onder de middencirkel van het veld: groot scorebord openen. */}
+      {onOpenBig && (
+        <button
+          className="board-expand"
+          onClick={onOpenBig}
+          aria-label="Open groot scorebord"
+          title="Groot scorebord"
+        >
+          <ExpandIcon />
+        </button>
+      )}
       <div className="board-row">
         <div className="side">
           <span className={left.ours ? 'team-name team-name-ours' : 'team-name'}>{left.name}</span>
@@ -3284,6 +3411,22 @@ function PlusIcon() {
         stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+// Twee pijltjes naar buiten: linksonder en rechtsboven.
+function ExpandIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        d="M14 3h7v7M21 3l-7 7M10 21H3v-7M3 21l7-7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   )
