@@ -67,6 +67,23 @@ function speechEnabled() {
   }
 }
 
+// Trillen staat ook standaard aan, los van de gesproken meldingen. iPhones
+// ondersteunen trillen vanuit een webapp niet.
+const VIBRATE_KEY = 'scorebord-vibrate'
+const canVibrate = () => typeof navigator !== 'undefined' && 'vibrate' in navigator
+function vibrationEnabled() {
+  try {
+    return localStorage.getItem(VIBRATE_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+function vibrate(pattern, { force = false } = {}) {
+  if (!force && !vibrationEnabled()) return
+  navigator.vibrate?.(pattern)
+}
+
 // Spreekt een korte melding uit via de spraak van het toestel (Nederlandse
 // stem als die er is). Loopt enkel zolang de app op het scherm staat.
 function say(text, { force = false } = {}) {
@@ -454,6 +471,18 @@ export default function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [theme, setTheme] = useState(loadTheme)
   const [speech, setSpeech] = useState(speechEnabled)
+  const [vibration, setVibration] = useState(vibrationEnabled)
+  const changeVibration = (on) => {
+    try {
+      if (on) localStorage.removeItem(VIBRATE_KEY)
+      else localStorage.setItem(VIBRATE_KEY, 'off')
+    } catch {
+      // opslag geweigerd; de keuze geldt dan niet na herladen
+    }
+    setVibration(on)
+    // Meteen even voelen dat het werkt.
+    if (on) vibrate([160, 90, 160], { force: true })
+  }
   const changeSpeech = (on) => {
     try {
       if (on) localStorage.removeItem(SPEECH_KEY)
@@ -600,7 +629,7 @@ export default function App() {
     // ">=" i.p.v. "===": als de app een tijdje op de achtergrond stond, kan de
     // klok in één keer over de periodegrens heen springen.
     if (periodSeconds <= 0 || prev >= periodSeconds || clock < periodSeconds) return
-    navigator.vibrate?.([160, 90, 160])
+    vibrate([160, 90, 160])
     const ended = match.period >= match.periodsCount ? 'Einde wedstrijd' : `Einde periode ${match.period}`
     say(ended)
     notify(ended, `${TEAM} ${score.us}–${score.them} ${opponentName}`)
@@ -644,7 +673,7 @@ export default function App() {
     const prev = prevSubIndex.current
     prevSubIndex.current = subIndex
     if (intervalChanged || subIndex <= prev || subPhase !== 'now' || subDismissed) return
-    navigator.vibrate?.([300, 120, 300, 120, 300])
+    vibrate([300, 120, 300, 120, 300])
     say('Tijd voor wissel')
     notify('Tijd voor wissel', `Periode ${match.period} · ${mmss(lastSub)}`)
   }, [subIndex, subPhase, subDismissed])
@@ -657,6 +686,7 @@ export default function App() {
     prevSubPhase.current = subPhase
     if (intervalChanged || prev === 'soon' || subPhase !== 'soon' || subDismissed) return
     if (nextSub - clock < SUB_COUNTDOWN - 3) return
+    vibrate([120])
     say(`Wissel over ${SUB_COUNTDOWN} seconden`)
     notify(`Wissel over ${SUB_COUNTDOWN} seconden`, `Periode ${match.period}`)
   }, [subPhase, subDismissed, nextSub, clock])
@@ -1290,6 +1320,8 @@ export default function App() {
           onAutoBackup={setAutoBackup}
           speech={speech}
           onSpeech={changeSpeech}
+          vibration={vibration}
+          onVibration={changeVibration}
         />
       ) : (
         <Stats teams={state.teams} history={state.history} defaultTeamId={state.activeTeamId} />
@@ -2376,6 +2408,8 @@ function Settings({
   onAutoBackup,
   speech,
   onSpeech,
+  vibration,
+  onVibration,
 }) {
   return (
     <section className="pane-settings">
@@ -2411,6 +2445,18 @@ function Settings({
           label="Gesproken meldingen"
           sub="De app zegt hardop wanneer er gewisseld moet worden en wanneer een periode voorbij is."
         />
+        <SwitchRow
+          className="switch-row-split"
+          checked={canVibrate() && vibration}
+          onChange={onVibration}
+          disabled={!canVibrate()}
+          label="Trillen"
+          sub={
+            canVibrate()
+              ? 'De gsm trilt bij elke wisselmelding en op het einde van een periode.'
+              : 'Dit toestel kan niet trillen vanuit de app (bv. iPhone).'
+          }
+        />
       </div>
 
       <h2 className="section-title">Back-up</h2>
@@ -2431,12 +2477,13 @@ function Settings({
   )
 }
 
-function SwitchRow({ checked, onChange, label, sub, className }) {
+function SwitchRow({ checked, onChange, label, sub, className, disabled }) {
   return (
     <button
       className={className ? `switch-row ${className}` : 'switch-row'}
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
     >
       <span className="switch-text">

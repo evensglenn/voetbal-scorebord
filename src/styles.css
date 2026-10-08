@@ -1136,6 +1136,11 @@ body {
   border-top: 1px solid var(--line-soft);
 }
 
+.switch-row:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .switch-text {
   display: flex;
   flex: 1;
