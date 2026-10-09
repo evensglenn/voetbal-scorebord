@@ -28,9 +28,10 @@ import { firebaseConfig } from './firebase-config.js'
 import { version as APP_VERSION } from '../package.json'
 
 const app = initializeApp(firebaseConfig)
-const auth = getAuth(app)
+// auth en db ook voor de emulatortests (firebase.emulator.test.js).
+export const auth = getAuth(app)
 auth.languageCode = 'nl'
-const db = getFirestore(app)
+export const db = getFirestore(app)
 
 // Lokaal tegen de Firebase-emulators met testdata (npm run dev:local).
 if (import.meta.env.VITE_USE_EMULATORS === 'true') {

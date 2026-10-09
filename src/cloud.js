@@ -45,13 +45,13 @@ const newWriteId = () => Math.random().toString(36).slice(2, 12)
 
 // Een nieuw toestel zonder spelers of uitslagen: niets om te bewaren, dus
 // gewoon de online gegevens overnemen in plaats van samen te voegen.
-const isEmpty = (s) =>
+export const isEmpty = (s) =>
   s.history.length === 0 && s.teams.every((t) => t.players.length === 0 && !t.started)
 
 // Twee toestellen hebben tegelijk iets gewijzigd. Uitslagen en ploegen van
 // beide kanten blijven bewaard; voor een ploeg die op beide bestaat, wint
 // die van dit toestel (daar is net op getikt).
-function merge(local, remote) {
+export function merge(local, remote) {
   const teams = new Map(remote.teams.map((t) => [t.id, t]))
   for (const t of local.teams) teams.set(t.id, t)
   const history = new Map()
@@ -69,7 +69,7 @@ function merge(local, remote) {
 
 // Welke ploeg openstaat, blijft per toestel: de tablet kan zo de
 // statistieken van de U9 bekijken terwijl de gsm de U7 bijhoudt.
-const withActiveTeam = (next, local) => ({
+export const withActiveTeam = (next, local) => ({
   ...next,
   activeTeamId: next.teams.some((t) => t.id === local.activeTeamId)
     ? local.activeTeamId

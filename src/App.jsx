@@ -142,7 +142,7 @@ function askNotificationPermission() {
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 
-const emptyTeam = (ageGroup = 'U9') => {
+export const emptyTeam = (ageGroup = 'U9') => {
   const cfg = AGE_CONFIG[ageGroup] ?? AGE_CONFIG.U9
   return {
     id: uid(),
@@ -165,7 +165,7 @@ const emptyTeam = (ageGroup = 'U9') => {
 
 // Houdt clocks/period in lijn met periodsCount, ook nadat iemand dat aantal
 // handmatig wijzigt of na het inladen van (mogelijk verouderde) opslag.
-function normalizeTeam(team) {
+export function normalizeTeam(team) {
   const n = Math.max(1, team.periodsCount || 1)
   const playerIds = team.players.map((p) => p.id)
   return {
@@ -206,7 +206,7 @@ function loadTheme() {
 
 // Zet opgeslagen gegevens (uit localStorage of een back-up) om naar een
 // geldige app-staat; null als er niets bruikbaars in zit.
-function fromStored(parsed) {
+export function fromStored(parsed) {
   if (!parsed || typeof parsed !== 'object') return null
   const history = Array.isArray(parsed.history) ? parsed.history : []
   if (Array.isArray(parsed.teams) && parsed.teams.length > 0) {
@@ -259,7 +259,7 @@ const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
 // Een hattrick is drie doelpunten na elkaar van dezelfde speler. Elk ander doelpunt
 // breekt de reeks: van een ploegmaat, van de tegenstander, of een doelpunt zonder naam.
-function analyseRuns(events) {
+export function analyseRuns(events) {
   const n = events.length
   const lens = new Array(n).fill(0)
   let prev = null
@@ -327,7 +327,7 @@ function groupScorers(scorers) {
 // Zet een (lopende of afgewerkte) match om in het data-formaat dat de
 // samenvattingsafbeelding (Summary/drawSummary) verwacht. Puur op basis van
 // de match zelf, zodat dit ook werkt voor bewaarde matchen in de historiek.
-function buildSummary(match) {
+export function buildSummary(match) {
   const opponentName = match.opponent?.trim() || OPPONENT
   const score = {
     us: match.events.filter((e) => e.team === 'us').length,
