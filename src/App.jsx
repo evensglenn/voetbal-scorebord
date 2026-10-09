@@ -2947,14 +2947,71 @@ const COUNT_MS = 700
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
+// Iets pas "in beeld" noemen als het boven de tabbalk onderaan uitkomt.
+const REVEAL_MARGIN = '0px 0px -12% 0px'
+
+const canObserve = () => 'IntersectionObserver' in window && !reducedMotion()
+
+// Wordt true zodra het element voor het eerst in beeld komt, en blijft dat.
+// Zonder IntersectionObserver of met "Beperk beweging" meteen true.
+function useSeen(ref) {
+  const [seen, setSeen] = useState(() => !canObserve())
+
+  useEffect(() => {
+    if (seen || !ref.current) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setSeen(true)
+      },
+      { rootMargin: REVEAL_MARGIN },
+    )
+    io.observe(ref.current)
+    return () => io.disconnect()
+  }, [seen, ref])
+
+  return seen
+}
+
+// Laat de animaties van tegels en kaarten pas lopen als ze in beeld komen:
+// tot dan staan ze in de CSS gepauzeerd (zie [data-seen] in styles.css).
+// Draait na elke render, zodat ook opnieuw opgebouwde lijsten (andere ploeg,
+// sortering of weergave) meedoen.
+function useRevealOnScroll(root) {
+  useEffect(() => {
+    const els = root.current?.querySelectorAll(
+      '.stat-tiles:not([data-seen]), .stat-card:not([data-seen])',
+    )
+    if (!els?.length) return
+    if (!canObserve()) {
+      els.forEach((el) => (el.dataset.seen = ''))
+      return
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue
+          e.target.dataset.seen = ''
+          io.unobserve(e.target)
+        }
+      },
+      { rootMargin: REVEAL_MARGIN },
+    )
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  })
+}
+
 // Telt een cijfer op vanaf nul (of vanaf de vorige waarde als het verandert),
-// snel in het begin en rustig uitbollend. Met "Beperk beweging" staat het
-// meteen op de eindwaarde.
+// snel in het begin en rustig uitbollend, zodra het in beeld komt. Met
+// "Beperk beweging" staat het meteen op de eindwaarde.
 function CountUp({ value, decimals = 0 }) {
+  const el = useRef(null)
+  const seen = useSeen(el)
   const [shown, setShown] = useState(() => (reducedMotion() ? value : 0))
   const from = useRef(shown)
 
   useEffect(() => {
+    if (!seen) return
     if (reducedMotion()) {
       from.current = value
       setShown(value)
@@ -2972,10 +3029,14 @@ function CountUp({ value, decimals = 0 }) {
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [value])
+  }, [value, seen])
 
   // Math.round(-0,4) geeft -0; String() maakt daar gewoon "0" van.
-  return String(decimals ? shown.toFixed(decimals) : Math.round(shown)).replace('.', ',')
+  return (
+    <span ref={el}>
+      {String(decimals ? shown.toFixed(decimals) : Math.round(shown)).replace('.', ',')}
+    </span>
+  )
 }
 
 const scoreLine = (h) => `${ourGoals(h)}–${theirGoals(h)} tegen ${h.theirName}`
@@ -2984,6 +3045,8 @@ function Stats({ teams, history, defaultTeamId }) {
   const [teamId, setTeamId] = useState(defaultTeamId)
   const [penaltySort, setPenaltySort] = useState('scored')
   const [goalsView, setGoalsView] = useState('total')
+  const pane = useRef(null)
+  useRevealOnScroll(pane)
   const team = teams.find((t) => t.id === teamId) ?? teams[0]
   const played = playedBy(team, history)
   const st = teamStats(played)
@@ -3002,7 +3065,7 @@ function Stats({ teams, history, defaultTeamId }) {
   const topGoals = Math.max(1, ...st.scorers.map((p) => p.goals))
 
   return (
-    <section className="pane-stats">
+    <section className="pane-stats" ref={pane}>
       <h2 className="section-title">Statistieken</h2>
       {/* Ploegkeuze enkel als er iets te kiezen valt, net als bij Uitslagen. */}
       {teams.length > 1 && (

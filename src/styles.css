@@ -2933,6 +2933,15 @@ input:focus-visible {
   animation-delay: 200ms;
 }
 
+/* Statistieken wachten tot ze in beeld komen (zie useRevealOnScroll):
+   een gepauzeerde animatie blijft op haar beginstand staan. */
+.stat-tiles:not([data-seen]) > .stat-tile,
+.stat-card:not([data-seen]),
+.stat-card:not([data-seen]) *,
+.stat-card:not([data-seen]) li::before {
+  animation-play-state: paused;
+}
+
 @keyframes grow-x {
   from {
     transform: scaleX(0);
