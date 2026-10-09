@@ -25,6 +25,7 @@ import {
   setDoc,
 } from 'firebase/firestore'
 import { firebaseConfig } from './firebase-config.js'
+import { jsonBytes, MAX_STATE_BYTES } from './storage.js'
 import { version as APP_VERSION } from '../package.json'
 
 const app = initializeApp(firebaseConfig)
@@ -39,9 +40,6 @@ if (import.meta.env.VITE_USE_EMULATORS === 'true') {
   connectFirestoreEmulator(db, '127.0.0.1', 8080)
 }
 
-// Firestore bewaart een document tot 1 MiB; hou wat marge.
-const MAX_SIZE = 1_000_000
-
 // Eén document per gebruiker, met de hele app-staat als JSON-tekst erin. Zo
 // hoeft het dataformaat niet in Firestore-velden vertaald te worden en blijft
 // fromStored (zelfde als voor localStorage en back-ups) de enige ingang.
@@ -52,7 +50,7 @@ const KEEP_BACKUPS = 8
 
 const toJson = (state) => {
   const json = JSON.stringify(state)
-  if (json.length > MAX_SIZE) throw Object.assign(new Error('te groot'), { code: 'too-large' })
+  if (jsonBytes(json) > MAX_STATE_BYTES) throw Object.assign(new Error('te groot'), { code: 'too-large' })
   return json
 }
 

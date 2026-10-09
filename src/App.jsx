@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { drawSummary, loadClubLogo, heightFor, W as SHOT_W } from './summary.js'
 import { useCloudSync } from './cloud.js'
+import { formatBytes, storageUsage } from './storage.js'
 import { version as APP_VERSION } from '../package.json'
 
 const STORAGE_KEY = 'matchblad.v1'
@@ -420,6 +421,9 @@ export function buildSummary(match) {
 export default function App() {
   const [state, setState] = useState(load)
   const cloud = useCloudSync(state, setState, { fromStored, freshState })
+  // Enkel opnieuw meten als de gegevens veranderen (niet bij elke kloktik).
+  const storage = useMemo(() => storageUsage(state), [state])
+  const storageAlert = cloud.available && (storage.level !== 'ok' || cloud.error === 'too-large')
   const activeTeam = state.teams.find((t) => t.id === state.activeTeamId) ?? state.teams[0]
   const match = activeTeam
   // Zolang er al gescoord is of de klok al gelopen heeft, is deze match "bezig"
@@ -1093,8 +1097,10 @@ export default function App() {
           className={screen === 'settings' ? 'tab is-on' : 'tab'}
           onClick={() => setScreen('settings')}
           aria-current={screen === 'settings' ? 'page' : undefined}
+          aria-label={storageAlert ? 'Instellingen – je account raakt vol' : undefined}
         >
           <GearIcon />
+          {storageAlert && <span className="tab-dot" aria-hidden="true" />}
           <span>Instellingen</span>
         </button>
       </nav>
@@ -1399,6 +1405,7 @@ export default function App() {
           onTheme={setTheme}
           state={state}
           cloud={cloud}
+          storage={storage}
           restoreBlocked={state.teams.some((t) => t.started)}
           onRestore={setState}
           speech={speech}
@@ -2575,6 +2582,7 @@ function Settings({
   onTheme,
   state,
   cloud,
+  storage,
   restoreBlocked,
   onRestore,
   speech,
@@ -2633,7 +2641,7 @@ function Settings({
       {cloud.available && (
         <>
           <h2 className="section-title">Account</h2>
-          <Account cloud={cloud} />
+          <Account cloud={cloud} storage={storage} />
         </>
       )}
 
@@ -2675,7 +2683,8 @@ function SwitchRow({ checked, onChange, label, sub, className, disabled }) {
 
 // Foutcodes van Firebase omgezet naar iets wat een trainer langs de lijn snapt.
 const CLOUD_ERRORS = {
-  'too-large': 'Er staan te veel gegevens in de app om online te bewaren.',
+  'too-large':
+    'Je account zit vol: nieuwe wijzigingen gaan niet meer online. Verwijder oude wedstrijden bij Uitslagen.',
   'permission-denied': 'Je account heeft geen toegang tot de online opslag.',
   'auth/unauthorized-domain': 'Inloggen is voor dit webadres nog niet toegelaten.',
   'auth/network-request-failed': 'Geen verbinding. Probeer opnieuw zodra je bereik hebt.',
@@ -2692,7 +2701,35 @@ const syncTime = (t) =>
 
 // Inloggen met Google: dan staan ploegen en uitslagen ook online en op elk
 // toestel waarop je met hetzelfde account inlogt.
-function Account({ cloud }) {
+// Hoeveel plaats er gebruikt is, met een waarschuwing ruim voor het vol is.
+function StorageUsage({ storage }) {
+  const { bytes, share, level, matchesLeft } = storage
+  return (
+    <div className={`storage is-${level}`}>
+      <div
+        className="storage-bar"
+        role="meter"
+        aria-label="Plaats gebruikt in je account"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(share * 100)}
+        style={{ '--used': share }}
+      />
+      <p className="backup-note">
+        {`${formatBytes(bytes)} van 1 MB gebruikt · plaats voor nog ongeveer ${countLabel(matchesLeft, 'wedstrijd', 'wedstrijden')}.`}
+      </p>
+      {level !== 'ok' && (
+        <p className={level === 'full' ? 'backup-note is-error' : 'backup-note is-warn'} role="status">
+          {level === 'full'
+            ? 'Je account is bijna vol. Bewaar een back-upbestand en verwijder daarna oude wedstrijden bij Uitslagen, anders gaan nieuwe wijzigingen straks niet meer online.'
+            : 'Je account raakt vol. Bewaar eens een back-upbestand en verwijder oude wedstrijden bij Uitslagen die je niet meer nodig hebt.'}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function Account({ cloud, storage }) {
   const { user, status, error, syncedAt } = cloud
   if (!user) {
     return (
@@ -2727,6 +2764,7 @@ function Account({ cloud }) {
                 ? `Gesynchroniseerd op ${syncTime(syncedAt)}.`
                 : 'Gesynchroniseerd.'}
       </p>
+      <StorageUsage storage={storage} />
       <div className="row row-flush account-actions">
         <button className="btn btn-wide" onClick={cloud.signOut}>
           Uitloggen

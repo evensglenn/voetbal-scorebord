@@ -66,6 +66,8 @@ the owner fixes it with `sudo chown -R $(whoami) ~/.npm`).
 | `src/summary.js` | Canvas drawing of the shareable match summary image (`drawSummary`, `heightFor`) |
 | `src/cloud.js` | `useCloudSync`: optional sync of the whole state with Firebase (merge, retry, status) |
 | `src/firebase.js` | The only file that touches the Firebase SDK; dynamically imported by `cloud.js` |
+| `src/storage.js` | Size of the state in bytes vs. the 1 MB Firestore limit; level `ok`/`warn` (75%)/`full` (90%) |
+| `src/EnvBadge.jsx` | Badge at the top in dev: green "Lokaal · testdata" (emulators), red "Lokaal · echte gegevens" (`npm run dev`) |
 | `src/firebase-config.js` | Public Firebase web config; empty `apiKey` = feature hidden |
 | `firestore.rules` | Firestore security rules (deployed automatically on push to `main`) |
 | `firebase.json`, `scripts/emulators.mjs`, `scripts/seed-emulator.mjs` | `dev:local`: Auth + Firestore emulators, seeded with a "Test" account, 2 teams, 12 matches, 2 backups |
@@ -154,6 +156,9 @@ on), `dirty` (local changes not yet uploaded), `uid`, `writeId`, `syncedAt`.
 - State applied from online is tracked in a ref so it is not marked dirty again; our own
   write echoes are recognised by `writeId`.
 - `activeTeamId` stays per device.
+- Storage: Settings → Account shows the used share of 1 MB and an estimate of matches
+  left (median match size). From 75% a warning and a dot on the Instellingen tab; pushes
+  above the limit fail with `too-large`.
 - Backups: once the state is synced and `backupAt` is older than a week, a copy goes to
   `users/{uid}/backups` (`saveBackup` skips it when another device made one recently and
   prunes to the newest 8). `CloudBackups` in Settings lists them, makes one on demand, and
