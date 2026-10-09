@@ -9,14 +9,23 @@ import { ExpandIcon } from './icons.jsx'
 // Staand (vertical) draait het veld een kwartslag voor hoge vlakken.
 // Eén segment per periode: afgelopen periodes vol, de huidige loopt mee met
 // de klok, de volgende nog leeg.
-export function PeriodProgress({ count, period, progress }) {
+// Met labelled staat "Periode 2" boven het segment van de lopende periode
+// (wedstrijdscherm); zonder enkel de balk (groot scorebord).
+export function PeriodProgress({ count, period, progress, labelled = false }) {
   return (
-    <div className="period-progress" aria-hidden="true">
+    <div className={labelled ? 'period-progress is-labelled' : 'period-progress'} aria-hidden={!labelled}>
       {Array.from({ length: count }, (_, i) => i + 1).map((p) => {
         const fill = p < period ? 1 : p > period ? 0 : progress
-        return (
-          <span key={p} className={p === period ? 'period-seg is-current' : 'period-seg'}>
+        const seg = (
+          <span key={p} className={p === period ? 'period-seg is-current' : 'period-seg'} aria-hidden="true">
             <span className="period-seg-fill" style={{ width: `${fill * 100}%` }} />
+          </span>
+        )
+        if (!labelled) return seg
+        return (
+          <span key={p} className="period-col">
+            <span className="period-label">{p === period ? `Periode ${p}` : ''}</span>
+            {seg}
           </span>
         )
       })}
