@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { drawSummary, loadClubLogo, heightFor, W as SHOT_W } from './summary.js'
 import { useCloudSync } from './cloud.js'
-import { formatBytes, storageUsage } from './storage.js'
+import { formatShare, storageUsage } from './storage.js'
 import { version as APP_VERSION } from '../package.json'
 
 const STORAGE_KEY = 'matchblad.v1'
@@ -2703,7 +2703,7 @@ const syncTime = (t) =>
 // toestel waarop je met hetzelfde account inlogt.
 // Hoeveel plaats er gebruikt is, met een waarschuwing ruim voor het vol is.
 function StorageUsage({ storage }) {
-  const { bytes, share, level, matchesLeft } = storage
+  const { share, level, matchesLeft } = storage
   return (
     <div className={`storage is-${level}`}>
       <div
@@ -2716,7 +2716,8 @@ function StorageUsage({ storage }) {
         style={{ '--used': share }}
       />
       <p className="backup-note">
-        {`${formatBytes(bytes)} van 1 MB gebruikt · plaats voor nog ongeveer ${countLabel(matchesLeft, 'wedstrijd', 'wedstrijden')}.`}
+        <strong>{formatShare(share)} gebruikt</strong>
+        {` · plaats voor nog ongeveer ${countLabel(matchesLeft, 'wedstrijd', 'wedstrijden')}.`}
       </p>
       {level !== 'ok' && (
         <p className={level === 'full' ? 'backup-note is-error' : 'backup-note is-warn'} role="status">

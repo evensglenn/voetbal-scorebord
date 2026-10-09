@@ -156,7 +156,7 @@ on), `dirty` (local changes not yet uploaded), `uid`, `writeId`, `syncedAt`.
 - State applied from online is tracked in a ref so it is not marked dirty again; our own
   write echoes are recognised by `writeId`.
 - `activeTeamId` stays per device.
-- Storage: Settings → Account shows the used share of 1 MB and an estimate of matches
+- Storage: Settings → Account shows the used share of 1 MB as a percentage and an estimate of matches
   left (median match size). From 75% a warning and a dot on the Instellingen tab; pushes
   above the limit fail with `too-large`.
 - Backups: once the state is synced and `backupAt` is older than a week, a copy goes to

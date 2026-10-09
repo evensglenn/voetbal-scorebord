@@ -5,7 +5,9 @@ const tabSettings = (page) => page.locator('nav.tabs .tab').last()
 test('Instellingen toont hoeveel plaats er gebruikt is', async ({ signedIn: page }) => {
   await tab(page, 4)
   await expect(page.getByRole('meter', { name: 'Plaats gebruikt in je account' })).toBeVisible()
-  await expect(page.getByText(/kB van 1 MB gebruikt · plaats voor nog ongeveer \d+ wedstrijden/)).toBeVisible()
+  await expect(page.locator('.storage .backup-note').first()).toHaveText(
+    /^(minder dan 1|\d+)% gebruikt · plaats voor nog ongeveer \d+ wedstrijden\.$/,
+  )
   await expect(tabSettings(page).locator('.tab-dot')).toHaveCount(0)
 })
 
@@ -23,5 +25,6 @@ test.describe('een account dat vol raakt', () => {
     await expect(tabSettings(page)).toHaveAttribute('aria-label', 'Instellingen – je account raakt vol')
     await tab(page, 4)
     await expect(page.getByText('Je account raakt vol.', { exact: false })).toBeVisible()
+    await expect(page.locator('.storage .backup-note').first()).toContainText('80% gebruikt')
   })
 })

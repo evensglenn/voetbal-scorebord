@@ -38,7 +38,6 @@ export function storageUsage(state) {
   }
 }
 
-export const formatBytes = (bytes) =>
-  bytes < 999_500
-    ? `${Math.max(1, Math.round(bytes / 1000))} kB`
-    : `${(bytes / 1_000_000).toFixed(1).replace('.', ',')} MB`
+// "4%", of "minder dan 1%" voor een account dat nog bijna leeg is.
+export const formatShare = (share) =>
+  share < 0.005 ? 'minder dan 1%' : `${Math.round(share * 100)}%`
