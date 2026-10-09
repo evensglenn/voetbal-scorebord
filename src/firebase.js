@@ -10,7 +10,18 @@ import {
   signInWithRedirect,
   signOut as firebaseSignOut,
 } from 'firebase/auth'
-import { doc, getFirestore, onSnapshot, runTransaction } from 'firebase/firestore'
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  getFirestore,
+  onSnapshot,
+  orderBy,
+  query,
+  runTransaction,
+  setDoc,
+} from 'firebase/firestore'
 import { firebaseConfig } from './firebase-config.js'
 import { version as APP_VERSION } from '../package.json'
 
@@ -26,6 +37,15 @@ const MAX_SIZE = 1_000_000
 // hoeft het dataformaat niet in Firestore-velden vertaald te worden en blijft
 // fromStored (zelfde als voor localStorage en back-ups) de enige ingang.
 const userDoc = (uid) => doc(db, 'users', uid)
+// Back-ups: losse kopieën van de hele staat, naast het hoofddocument.
+const backupsOf = (uid) => collection(db, 'users', uid, 'backups')
+const KEEP_BACKUPS = 8
+
+const toJson = (state) => {
+  const json = JSON.stringify(state)
+  if (json.length > MAX_SIZE) throw Object.assign(new Error('te groot'), { code: 'too-large' })
+  return json
+}
 
 export const watchUser = (callback) =>
   onAuthStateChanged(auth, (user) =>
@@ -85,8 +105,7 @@ export const watchState = (uid, onRemote, onError) =>
 // deze staat verder bouwt (base). Anders heeft een ander toestel intussen iets
 // bewaard en krijgt de oproeper die versie terug om eerst samen te voegen.
 export async function pushState(uid, base, state, writeId) {
-  const json = JSON.stringify(state)
-  if (json.length > MAX_SIZE) throw Object.assign(new Error('te groot'), { code: 'too-large' })
+  const json = toJson(state)
   return runTransaction(db, async (tx) => {
     const snap = await tx.get(userDoc(uid))
     const remote = snap.exists() ? snap.data() : null
@@ -95,4 +114,43 @@ export async function pushState(uid, base, state, writeId) {
     tx.set(userDoc(uid), { state: json, updatedAt, writeId, appVersion: APP_VERSION })
     return { updatedAt }
   })
+}
+
+// Nieuwste eerst. Met de inhoud erbij, zodat terugzetten geen extra ophaling vraagt.
+export async function listBackups(uid) {
+  const snap = await getDocs(query(backupsOf(uid), orderBy('createdAt', 'desc')))
+  return snap.docs.map((d) => {
+    const data = d.data()
+    return {
+      id: d.id,
+      createdAt: data.createdAt,
+      reason: data.reason ?? 'week',
+      teams: data.teams ?? 0,
+      matches: data.matches ?? 0,
+      state: data.state,
+    }
+  })
+}
+
+// Bewaart een kopie en ruimt alles op voorbij de laatste KEEP_BACKUPS. Met
+// ifOlderThan gebeurt er niets als er al een recentere kopie is (bv. net
+// gemaakt door een ander toestel); dan komt die datum terug.
+export async function saveBackup(uid, state, { reason, ifOlderThan } = {}) {
+  const existing = await listBackups(uid)
+  if (ifOlderThan && existing[0] && existing[0].createdAt > Date.now() - ifOlderThan) {
+    return existing[0].createdAt
+  }
+  const createdAt = Date.now()
+  await setDoc(doc(backupsOf(uid)), {
+    state: toJson(state),
+    createdAt,
+    reason,
+    teams: state.teams.length,
+    matches: state.history.length,
+    appVersion: APP_VERSION,
+  })
+  await Promise.all(
+    existing.slice(KEEP_BACKUPS - 1).map((b) => deleteDoc(doc(backupsOf(uid), b.id))),
+  )
+  return createdAt
 }

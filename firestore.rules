@@ -1,10 +1,14 @@
 rules_version = '2';
 
 // Plak dit in de Firebase console → Firestore Database → Regels.
-// Elke gebruiker kan enkel zijn eigen document lezen en schrijven.
+// Elke gebruiker kan enkel zijn eigen document (en zijn eigen back-ups)
+// lezen en schrijven.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /users/{uid}/backups/{backup} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
   }

@@ -123,4 +123,7 @@ Eenmalig instellen:
 4. **Projectinstellingen → Jouw apps → Web-app toevoegen** en neem `apiKey`,
    `authDomain`, `projectId` en `appId` over in `src/firebase-config.js`.
 
+Elke week bewaart de app vanzelf een kopie in je account; de laatste 8 blijven bewaard en
+zijn terug te zetten via **Instellingen → Back-up**.
+
 Zolang `src/firebase-config.js` leeg is, werkt de app zonder login, enkel lokaal.

@@ -21,6 +21,9 @@ const META_KEY = 'scorebord-cloud'
 // klok) samen in één keer online gaat.
 const PUSH_DELAY = 2000
 const RETRY_DELAY = 15000
+// Om de zoveel tijd automatisch een kopie in het account (zie saveBackup in
+// firebase.js, dat er 8 bijhoudt).
+const BACKUP_EVERY = 7 * 24 * 60 * 60 * 1000
 
 function readMeta() {
   try {
@@ -103,6 +106,7 @@ export function useCloudSync(state, setState, { fromStored, freshState }) {
   const lastState = useRef(state)
   const fromRemote = useRef(null)
   const pushing = useRef(false)
+  const backingUp = useRef(false)
 
   const saveMeta = useCallback((patch) => {
     metaRef.current = { ...metaRef.current, ...patch }
@@ -300,6 +304,44 @@ export function useCloudSync(state, setState, { fromStored, freshState }) {
     return () => clearTimeout(id)
   }, [cloud, user, meta.joined, meta.dirty, online, state, kick, push])
 
+  // Wekelijkse kopie, zodra alles online staat: zo is het de gesynchroniseerde
+  // stand die bewaard wordt. Lukt het niet, dan volgende keer opnieuw.
+  useEffect(() => {
+    if (!cloud || !user || !meta.joined || meta.dirty || !online || backingUp.current) return
+    if (Date.now() - (meta.backupAt ?? 0) < BACKUP_EVERY) return
+    backingUp.current = true
+    cloud
+      .saveBackup(user.uid, stateRef.current, { reason: 'week', ifOlderThan: BACKUP_EVERY })
+      .then((backupAt) => saveMeta({ backupAt }))
+      .catch(() => {})
+      .finally(() => {
+        backingUp.current = false
+      })
+  }, [cloud, user, meta.joined, meta.dirty, meta.backupAt, online, saveMeta])
+
+  const listBackups = useCallback(async () => {
+    const backups = await cloud.listBackups(user.uid)
+    return backups.map(({ state: json, ...b }) => ({ ...b, json }))
+  }, [cloud, user])
+
+  // Eerst nog een kopie van de huidige stand, zodat ook het terugzetten zelf
+  // terug ongedaan te maken is; daarna vervangt de kopie alles (en gaat die
+  // stand als gewone wijziging online).
+  const restoreBackup = useCallback(
+    async (backup) => {
+      const data = fromStored(JSON.parse(backup.json))
+      if (!data) throw new Error('onleesbaar')
+      await cloud.saveBackup(user.uid, stateRef.current, { reason: 'restore' })
+      setState(withActiveTeam(data, stateRef.current))
+    },
+    [cloud, user, fromStored, setState],
+  )
+
+  const backupNow = useCallback(async () => {
+    const backupAt = await cloud.saveBackup(user.uid, stateRef.current, { reason: 'manual' })
+    saveMeta({ backupAt })
+  }, [cloud, user, saveMeta])
+
   const signIn = useCallback(async () => {
     setError(null)
     try {
@@ -339,6 +381,9 @@ export function useCloudSync(state, setState, { fromStored, freshState }) {
     user: user ?? null,
     choice,
     resolveChoice,
+    listBackups,
+    restoreBackup,
+    backupNow,
     status,
     error,
     syncedAt: meta.syncedAt ?? null,

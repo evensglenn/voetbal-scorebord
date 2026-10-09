@@ -557,22 +557,6 @@ export default function App() {
     if (on) say('Gesproken meldingen staan aan', { force: true })
     else window.speechSynthesis?.cancel()
   }
-  const [autoBackup, setAutoBackup] = useState(() => {
-    try {
-      return localStorage.getItem(AUTO_BACKUP_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
-
-  useEffect(() => {
-    try {
-      if (autoBackup) localStorage.setItem(AUTO_BACKUP_KEY, '1')
-      else localStorage.removeItem(AUTO_BACKUP_KEY)
-    } catch {
-      // opslag geweigerd; de keuze geldt dan enkel voor deze sessie
-    }
-  }, [autoBackup])
   const [standalone] = useState(
     () =>
       window.matchMedia?.('(display-mode: standalone)').matches ||
@@ -999,8 +983,6 @@ export default function App() {
       ),
     })
     setState(finish)
-    // Nog binnen de tik op "Ja, beëindig", zodat het deelvenster mag openen.
-    if (autoBackup) saveBackup(finish(state)).catch(() => {})
     setPenaltiesOpen(false)
     setEnding(false)
     // Meteen de samenvatting tonen om te delen; later terug te vinden in de Historiek.
@@ -1407,8 +1389,6 @@ export default function App() {
           cloud={cloud}
           restoreBlocked={state.teams.some((t) => t.started)}
           onRestore={setState}
-          autoBackup={autoBackup}
-          onAutoBackup={setAutoBackup}
           speech={speech}
           onSpeech={changeSpeech}
           vibration={vibration}
@@ -2571,8 +2551,6 @@ function Settings({
   cloud,
   restoreBlocked,
   onRestore,
-  autoBackup,
-  onAutoBackup,
   speech,
   onSpeech,
   vibration,
@@ -2634,13 +2612,12 @@ function Settings({
       )}
 
       <h2 className="section-title">Back-up</h2>
+      {cloud.available && <CloudBackups cloud={cloud} restoreBlocked={restoreBlocked} />}
       <Backup
         state={state}
         inCloud={cloud.available}
         restoreBlocked={restoreBlocked}
         onRestore={onRestore}
-        autoBackup={autoBackup}
-        onAutoBackup={onAutoBackup}
       />
 
       <h2 className="section-title">Over</h2>
@@ -2840,10 +2817,123 @@ function JoinChoice({ choice, onChoose }) {
   )
 }
 
+const BACKUP_REASONS = { manual: ' · zelf bewaard', restore: ' · vóór terugzetten' }
+
+// Kopieën in het account: elke week één vanzelf (zie useCloudSync), de
+// laatste 8 blijven bewaard. Terugzetten bewaart eerst nog de huidige stand.
+function CloudBackups({ cloud, restoreBlocked }) {
+  const { user, listBackups } = cloud
+  const [backups, setBackups] = useState(null)
+  const [failed, setFailed] = useState(false)
+  const [pending, setPending] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState(null)
+
+  const refresh = useCallback(() => {
+    if (!user) return
+    listBackups()
+      .then((list) => {
+        setBackups(list)
+        setFailed(false)
+      })
+      .catch(() => setFailed(true))
+  }, [user, listBackups])
+  useEffect(refresh, [refresh])
+
+  const run = async (action, done) => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      await action()
+      setMessage({ text: done })
+      refresh()
+    } catch (e) {
+      setMessage({
+        error: true,
+        text: CLOUD_ERRORS[e?.code] ?? 'Dat is niet gelukt. Probeer het opnieuw.',
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="panel-card backup">
+        <p className="backup-text">
+          Elke week bewaart de app vanzelf een kopie in je account; de laatste 8 blijven
+          bewaard. Zo zet je alles terug zoals het toen was.
+        </p>
+        {!user ? (
+          <p className="backup-last">De kopieën zijn te zien zodra er verbinding is.</p>
+        ) : failed ? (
+          <p className="backup-last is-error">De kopieën konden niet geladen worden.</p>
+        ) : backups === null ? (
+          <p className="backup-last">Kopieën laden…</p>
+        ) : backups.length === 0 ? (
+          <p className="backup-last">Nog geen kopie bewaard.</p>
+        ) : (
+          <ul className="backup-list">
+            {backups.map((b) => (
+              <li key={b.id}>
+                <span className="switch-text">
+                  <span>{syncTime(b.createdAt)}</span>
+                  <span className="switch-sub">
+                    {contents(b)}
+                    {BACKUP_REASONS[b.reason] ?? ''}
+                  </span>
+                </span>
+                <button
+                  className="btn"
+                  onClick={() => setPending(b)}
+                  disabled={restoreBlocked || busy}
+                >
+                  Zet terug
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="row row-flush">
+          <button
+            className="btn btn-wide"
+            onClick={() => run(cloud.backupNow, 'Er is een kopie bewaard.')}
+            disabled={!user || busy}
+          >
+            Nu een kopie bewaren
+          </button>
+        </div>
+        {restoreBlocked && (
+          <p className="backup-note">Terugzetten kan pas na de lopende wedstrijd.</p>
+        )}
+        {message && (
+          <p className={message.error ? 'backup-note is-error' : 'backup-note'} role="status">
+            {message.text}
+          </p>
+        )}
+      </div>
+
+      {pending && (
+        <Confirm
+          title="Kopie terugzetten?"
+          body={`Alles wordt teruggezet zoals het was op ${syncTime(pending.createdAt)} (${contents(pending)}). Wat er nu staat, wordt eerst zelf nog als kopie bewaard.`}
+          confirmLabel="Ja, zet terug"
+          danger
+          onConfirm={() => {
+            const backup = pending
+            setPending(null)
+            run(() => cloud.restoreBackup(backup), 'De kopie is teruggezet.')
+          }}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </>
+  )
+}
+
 // Back-up: alles staat enkel in deze browser, dus een bestand bewaren
 // beschermt tegen gewiste browsergegevens of een nieuw toestel.
 const BACKUP_KEY = 'scorebord-last-backup'
-const AUTO_BACKUP_KEY = 'scorebord-auto-backup'
 const longDate = (d) =>
   new Date(d).toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -2866,7 +2956,7 @@ function download(file) {
 // Bestanden, Drive…), elders (Android, computer) gewoon downloaden. Android
 // laat het delen van .json-bestanden niet toe. Geeft false als het
 // deelvenster weggeklikt werd.
-async function saveBackup(state) {
+async function saveBackupFile(state) {
   const now = new Date().toISOString()
   const json = JSON.stringify(
     { app: 'scorebord', version: APP_VERSION, exportedAt: now, data: state },
@@ -2895,7 +2985,7 @@ async function saveBackup(state) {
   return true
 }
 
-function Backup({ state, inCloud, restoreBlocked, onRestore, autoBackup, onAutoBackup }) {
+function Backup({ state, inCloud, restoreBlocked, onRestore }) {
   const fileInput = useRef(null)
   const [lastBackup, setLastBackup] = useState(() => {
     try {
@@ -2909,7 +2999,7 @@ function Backup({ state, inCloud, restoreBlocked, onRestore, autoBackup, onAutoB
 
   const exportBackup = async () => {
     try {
-      if (!(await saveBackup(state))) return
+      if (!(await saveBackupFile(state))) return
     } catch {
       setMessage({ error: true, text: 'De back-up kon niet gemaakt worden.' })
       return
@@ -2940,7 +3030,7 @@ function Backup({ state, inCloud, restoreBlocked, onRestore, autoBackup, onAutoB
       <div className="panel-card backup">
         <p className="backup-text">
           {inCloud
-            ? 'Alles staat ook in je account. Een back-upbestand blijft handig als extra kopie.'
+            ? 'Liever ook een eigen bestand, bv. op het einde van het seizoen? Exporteer alles naar een back-upbestand.'
             : 'Alles staat enkel op dit toestel. Bewaar af en toe een back-up, zodat je spelers en uitslagen niet verloren gaan.'}
         </p>
         <p className="backup-last">
@@ -2959,16 +3049,9 @@ function Backup({ state, inCloud, restoreBlocked, onRestore, autoBackup, onAutoB
             Zet terug
           </button>
         </div>
-        {restoreBlocked && (
+        {restoreBlocked && !inCloud && (
           <p className="backup-note">Terugzetten kan pas na de lopende wedstrijd.</p>
         )}
-        <SwitchRow
-          className="switch-row-split"
-          checked={autoBackup}
-          onChange={onAutoBackup}
-          label="Na elke wedstrijd"
-          sub="Maak automatisch een back-up wanneer je een wedstrijd beëindigt."
-        />
         {message && (
           <p className={message.error ? 'backup-note is-error' : 'backup-note'} role="status">
             {message.text}
