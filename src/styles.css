@@ -3519,7 +3519,7 @@ input:focus-visible {
   content: '';
   position: absolute;
   inset: 0 auto 0 0;
-  /* Altijd een sprankje zichtbaar, ook bij een paar kB. */
+  /* Altijd een sprankje zichtbaar, ook bij een bijna leeg account. */
   width: max(0.4rem, calc(var(--used) * 100%));
   background: var(--muted);
   border-radius: inherit;
