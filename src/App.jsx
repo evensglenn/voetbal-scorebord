@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { drawSummary, loadClubLogo, heightFor, W as SHOT_W } from './summary.js'
+import { useCloudSync } from './cloud.js'
 import { version as APP_VERSION } from '../package.json'
 
 const STORAGE_KEY = 'matchblad.v1'
@@ -238,6 +239,11 @@ function fromStored(parsed) {
 // "Ploegen" vanaf de tweede.
 const teamsLabel = (teams) => (teams.length > 1 ? 'Ploegen' : 'Ploeg')
 
+function freshState() {
+  const first = emptyTeam('U9')
+  return { teams: [first], activeTeamId: first.id, history: [] }
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -246,8 +252,7 @@ function load() {
   } catch {
     // onleesbare opslag: begin met een lege ploeg
   }
-  const first = emptyTeam('U9')
-  return { teams: [first], activeTeamId: first.id, history: [] }
+  return freshState()
 }
 
 const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -414,6 +419,7 @@ function buildSummary(match) {
 
 export default function App() {
   const [state, setState] = useState(load)
+  const cloud = useCloudSync(state, setState, { fromStored, freshState })
   const activeTeam = state.teams.find((t) => t.id === state.activeTeamId) ?? state.teams[0]
   const match = activeTeam
   // Zolang er al gescoord is of de klok al gelopen heeft, is deze match "bezig"
@@ -1030,6 +1036,8 @@ export default function App() {
     setResetting(false)
   }
 
+  if (cloud.locked) return <Login cloud={cloud} />
+
   return (
     <div className={screen === 'match' && !match.started ? 'shell is-home' : 'shell'}>
       {/* Op het startscherm zit de titel mee in de startkaart. */}
@@ -1396,6 +1404,7 @@ export default function App() {
           theme={theme}
           onTheme={setTheme}
           state={state}
+          cloud={cloud}
           restoreBlocked={state.teams.some((t) => t.started)}
           onRestore={setState}
           autoBackup={autoBackup}
@@ -1413,6 +1422,8 @@ export default function App() {
       {viewingHistory && (
         <Summary data={viewingHistory} onClose={() => setViewingHistory(null)} />
       )}
+
+      {cloud.choice && <JoinChoice choice={cloud.choice} onChoose={cloud.resolveChoice} />}
 
       {startingMatch && (
         <StartMatch
@@ -2557,6 +2568,7 @@ function Settings({
   theme,
   onTheme,
   state,
+  cloud,
   restoreBlocked,
   onRestore,
   autoBackup,
@@ -2614,9 +2626,17 @@ function Settings({
         />
       </div>
 
+      {cloud.available && (
+        <>
+          <h2 className="section-title">Account</h2>
+          <Account cloud={cloud} />
+        </>
+      )}
+
       <h2 className="section-title">Back-up</h2>
       <Backup
         state={state}
+        inCloud={cloud.available}
         restoreBlocked={restoreBlocked}
         onRestore={onRestore}
         autoBackup={autoBackup}
@@ -2647,6 +2667,176 @@ function SwitchRow({ checked, onChange, label, sub, className, disabled }) {
       </span>
       <span className={checked ? 'switch is-on' : 'switch'} aria-hidden="true" />
     </button>
+  )
+}
+
+// Foutcodes van Firebase omgezet naar iets wat een trainer langs de lijn snapt.
+const CLOUD_ERRORS = {
+  'too-large': 'Er staan te veel gegevens in de app om online te bewaren.',
+  'permission-denied': 'Je account heeft geen toegang tot de online opslag.',
+  'auth/unauthorized-domain': 'Inloggen is voor dit webadres nog niet toegelaten.',
+  'auth/network-request-failed': 'Geen verbinding. Probeer opnieuw zodra je bereik hebt.',
+  'auth/popup-blocked': 'Het inlogvenster werd geblokkeerd.',
+}
+
+const syncTime = (t) =>
+  new Date(t).toLocaleString('nl-BE', {
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+// Inloggen met Google: dan staan ploegen en uitslagen ook online en op elk
+// toestel waarop je met hetzelfde account inlogt.
+function Account({ cloud }) {
+  const { user, status, error, syncedAt } = cloud
+  if (!user) {
+    return (
+      <div className="panel-card">
+        <p className="backup-text">
+          {cloud.loading
+            ? 'Je account wordt geladen…'
+            : 'Geen verbinding met je account. Wijzigingen gaan online zodra er weer bereik is.'}
+        </p>
+      </div>
+    )
+  }
+  return (
+    <div className="panel-card">
+      <div className="account-user">
+        {user.photo && (
+          <img className="account-photo" src={user.photo} alt="" referrerPolicy="no-referrer" />
+        )}
+        <span className="account-name">
+          <span>{user.name ?? user.email}</span>
+          {user.name && <span className="switch-sub">{user.email}</span>}
+        </span>
+      </div>
+      <p className={status === 'error' ? 'backup-note is-error' : 'backup-note'} role="status">
+        {status === 'error'
+          ? (CLOUD_ERRORS[error] ?? 'Synchroniseren is niet gelukt; de app probeert het opnieuw.')
+          : status === 'offline'
+            ? 'Geen verbinding. Wijzigingen gaan online zodra er weer bereik is.'
+            : status === 'syncing'
+              ? 'Bezig met synchroniseren…'
+              : syncedAt
+                ? `Gesynchroniseerd op ${syncTime(syncedAt)}.`
+                : 'Gesynchroniseerd.'}
+      </p>
+      <div className="row row-flush account-actions">
+        <button className="btn btn-wide" onClick={cloud.signOut}>
+          Uitloggen
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const countLabel = (n, one, many) => `${n} ${n === 1 ? one : many}`
+const contents = ({ teams, matches }) =>
+  `${countLabel(teams, 'ploeg', 'ploegen')} en ${countLabel(matches, 'wedstrijd', 'wedstrijden')}`
+
+// Zonder account geen app: alles wordt in het account bewaard.
+function Login({ cloud }) {
+  const offline = cloud.loadFailed
+  return (
+    <div className="shell is-home">
+      <div className="pane pane-play pane-home">
+        <section className="home-hero home-hero-login">
+          <Pitch vertical />
+          <h1 className="board-title">
+            <span className="board-title-club">{TEAM}</span>
+            <span className="board-title-sub">Scorebord</span>
+          </h1>
+          <img className="home-hero-logo" src={CLUB_LOGO} alt="" />
+          <h2 className="home-hero-title">Welkom</h2>
+          <p className="home-hero-sub">
+            {offline
+              ? 'Om de eerste keer in te loggen is er internet nodig.'
+              : 'Log in met je Google-account. Je ploegen en wedstrijden worden in je account bewaard en staan zo op al je toestellen.'}
+          </p>
+          {cloud.error && (
+            <p className="home-hero-sub login-error" role="status">
+              {CLOUD_ERRORS[cloud.error] ?? 'Inloggen is niet gelukt. Probeer het opnieuw.'}
+            </p>
+          )}
+          {offline ? (
+            <button className="btn btn-start-hero" onClick={() => window.location.reload()}>
+              Opnieuw proberen
+            </button>
+          ) : (
+            <button className="btn btn-start-hero" onClick={cloud.signIn} disabled={cloud.loading}>
+              {cloud.loading ? 'Even geduld…' : 'Inloggen met Google'}
+            </button>
+          )}
+        </section>
+      </div>
+    </div>
+  )
+}
+
+// Eerste login op een toestel waar al gegevens op staan: meenemen naar het
+// account, of wissen (bv. een toestel waarop enkel wat uitgeprobeerd werd).
+// Bewust zonder wegklikken: er moet gekozen worden, en wissen vraagt een
+// tweede bevestiging.
+function JoinChoice({ choice, onChoose }) {
+  const panel = useRef(null)
+  const [wiping, setWiping] = useState(false)
+  useEffect(() => panel.current?.focus(), [wiping])
+  const { local, remote } = choice
+
+  return createPortal(
+    <div className="overlay">
+      <div
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="join-title"
+        tabIndex={-1}
+        ref={panel}
+      >
+        {wiping ? (
+          <>
+            <h2 id="join-title">Zeker wissen?</h2>
+            <p>
+              {`De ${contents(local)} op dit toestel worden gewist. `}
+              {remote
+                ? `Daarna zie je hier wat in je account staat (${contents(remote)}).`
+                : 'Daarna begin je hier met een lege ploeg.'}
+              {' Dit kan niet ongedaan gemaakt worden.'}
+            </p>
+            <div className="dialog-actions">
+              <button className="btn" onClick={() => setWiping(false)}>
+                Terug
+              </button>
+              <button className="btn btn-danger" onClick={() => onChoose(false)}>
+                Ja, wis
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 id="join-title">Gegevens van dit toestel meenemen?</h2>
+            <p>
+              {`Op dit toestel staan ${contents(local)}. `}
+              {remote
+                ? `In je account staan al ${contents(remote)}. Meenemen voegt ze samen; anders worden ze van dit toestel gewist.`
+                : 'Je account is nog leeg. Meenemen zet ze in je account; anders worden ze van dit toestel gewist.'}
+            </p>
+            <div className="dialog-actions">
+              <button className="btn" onClick={() => setWiping(true)}>
+                Wis dit toestel
+              </button>
+              <button className="btn btn-primary" onClick={() => onChoose(true)}>
+                Meenemen
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -2705,7 +2895,7 @@ async function saveBackup(state) {
   return true
 }
 
-function Backup({ state, restoreBlocked, onRestore, autoBackup, onAutoBackup }) {
+function Backup({ state, inCloud, restoreBlocked, onRestore, autoBackup, onAutoBackup }) {
   const fileInput = useRef(null)
   const [lastBackup, setLastBackup] = useState(() => {
     try {
@@ -2749,8 +2939,9 @@ function Backup({ state, restoreBlocked, onRestore, autoBackup, onAutoBackup }) 
     <>
       <div className="panel-card backup">
         <p className="backup-text">
-          Alles staat enkel op dit toestel. Bewaar af en toe een back-up, zodat je
-          spelers en uitslagen niet verloren gaan.
+          {inCloud
+            ? 'Alles staat ook in je account. Een back-upbestand blijft handig als extra kopie.'
+            : 'Alles staat enkel op dit toestel. Bewaar af en toe een back-up, zodat je spelers en uitslagen niet verloren gaan.'}
         </p>
         <p className="backup-last">
           {lastBackup ? `Laatste back-up: ${longDate(lastBackup)}` : 'Nog geen back-up gemaakt.'}

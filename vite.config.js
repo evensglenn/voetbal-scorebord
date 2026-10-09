@@ -9,4 +9,7 @@ const base = !repo || repo.endsWith('.github.io') ? '/' : `/${repo}/`
 export default defineConfig({
   plugins: [react()],
   base,
+  // Firebase (enkel voor inloggen/synchroniseren) is één groot, apart ingeladen
+  // bestand; dat hoeft de build niet telkens te melden.
+  build: { chunkSizeWarningLimit: 800 },
 })

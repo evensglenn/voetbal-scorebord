@@ -4,7 +4,7 @@
 // het manifest) altijd door. Enkel de gehashte build-bestanden onder /assets/
 // (hun naam verandert zodra de inhoud verandert) mogen veilig eerst uit de cache.
 
-const CACHE = 'scorebord-v0.88.7'
+const CACHE = 'scorebord-v0.89.0'
 
 self.addEventListener('install', () => self.skipWaiting())
 
@@ -27,7 +27,13 @@ self.addEventListener('fetch', (event) => {
   const request = event.request
   if (request.method !== 'GET') return
 
-  const isHashedAsset = new URL(request.url).pathname.includes('/assets/')
+  // Enkel de app zelf; Firebase (inloggen, online opslag) en andere domeinen
+  // gaan rechtstreeks naar het netwerk. Een open Firestore-verbinding mag
+  // zeker niet in de cache belanden.
+  const url = new URL(request.url)
+  if (url.origin !== self.location.origin) return
+
+  const isHashedAsset = url.pathname.includes('/assets/')
 
   if (!isHashedAsset) {
     event.respondWith(

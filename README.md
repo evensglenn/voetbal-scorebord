@@ -103,3 +103,24 @@ Loopt de reeks door tot vier of vijf, dan telt het label mee.
 
 Onderaan de app staat een versienummer (bv. `v0.3.0`), rechtstreeks uit `package.json`.
 Bij elke wijziging aan de app hoort dat nummer een tikje omhoog te gaan.
+
+## Inloggen en synchroniseren
+
+De app vraagt om in te loggen met je Google-account. Ploegen, spelers en uitslagen staan
+daarna ook online, en op elk toestel waarop je met hetzelfde account inlogt. Staan er bij de
+eerste login al gegevens op het toestel, dan kies je of die mee naar je account gaan of
+gewist worden.
+De app blijft alles lokaal bewaren, dus zonder bereik werkt hij gewoon verder; wijzigingen
+gaan online zodra er weer netwerk is.
+
+Eenmalig instellen:
+
+1. Maak een project aan op <https://console.firebase.google.com>.
+2. **Authentication → Aan de slag → Google** inschakelen. Voeg onder **Instellingen →
+   Geautoriseerde domeinen** het domein van de app toe (bv. `evensglenn.github.io`).
+3. **Firestore Database → Database maken** (productiemodus, regio `eur3` of
+   `europe-west1`), en plak de inhoud van `firestore.rules` onder **Regels**.
+4. **Projectinstellingen → Jouw apps → Web-app toevoegen** en neem `apiKey`,
+   `authDomain`, `projectId` en `appId` over in `src/firebase-config.js`.
+
+Zolang `src/firebase-config.js` leeg is, werkt de app zonder login, enkel lokaal.

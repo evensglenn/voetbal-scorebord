@@ -3386,3 +3386,37 @@ input:focus-visible {
   grid-template-columns: repeat(3, 1fr);
   gap: 0.4rem;
 }
+
+/* Account (inloggen met Google) */
+.account-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+}
+.account-photo {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  flex: none;
+}
+.account-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.account-actions {
+  margin-top: 0.75rem;
+}
+
+/* Inlogscherm: zelfde vlak als het startscherm, maar zonder tabbalk eronder. */
+.home-hero.home-hero-login {
+  padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
+}
+.home-hero-login .home-hero-sub {
+  max-width: 22rem;
+}
+.home-hero-login .login-error {
+  color: #ffb4a8;
+}
