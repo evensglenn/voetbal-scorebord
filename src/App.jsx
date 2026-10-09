@@ -474,7 +474,9 @@ export default function App() {
   const [editingSubs, setEditingSubs] = useState(false)
   const [viewingHistory, setViewingHistory] = useState(null)
   const [compactBoard, setCompactBoard] = useState(false)
-  const [updateAvailable, setUpdateAvailable] = useState(false)
+  // Versienummer van de klaarstaande update ('' als het niet te lezen viel),
+  // null zolang er geen is of de melding weggeklikt werd.
+  const [updateAvailable, setUpdateAvailable] = useState(null)
   const [theme, setTheme] = useState(loadTheme)
 
   // Groot scorebord zelf openen: altijd op tablet en computer, op een gsm
@@ -669,7 +671,17 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const onUpdate = () => setUpdateAvailable(true)
+    // Het nieuwe versienummer staat in de cachenaam van sw.js (zie stamp-sw.js).
+    const onUpdate = () => {
+      setUpdateAvailable('')
+      fetch(`${import.meta.env.BASE_URL}sw.js`, { cache: 'no-store' })
+        .then((r) => r.text())
+        .then((text) => {
+          const version = text.match(/scorebord-v([\w.-]+)/)?.[1]
+          if (version) setUpdateAvailable((v) => (v === null ? v : version))
+        })
+        .catch(() => {})
+    }
     window.addEventListener('scorebord:update-available', onUpdate)
     return () => window.removeEventListener('scorebord:update-available', onUpdate)
   }, [])
@@ -1490,11 +1502,25 @@ export default function App() {
         />
       )}
 
-      {updateAvailable && (
+      {updateAvailable !== null && (
         <div className="update-toast" role="status">
-          <span>Nieuwe versie beschikbaar</span>
-          <button className="btn btn-primary" onClick={() => window.location.reload()}>
+          <span className="update-toast-icon">
+            <ResetIcon />
+          </span>
+          <span className="update-toast-text">
+            <strong>Nieuwe versie</strong>
+            <span>{updateAvailable ? `v${updateAvailable} staat klaar` : 'staat klaar'}</span>
+          </span>
+          <button className="btn update-toast-go" onClick={() => window.location.reload()}>
             Vernieuw
+          </button>
+          <button
+            className="update-toast-close"
+            onClick={() => setUpdateAvailable(null)}
+            aria-label="Sluit melding"
+            title="Later"
+          >
+            <CloseIcon />
           </button>
         </div>
       )}

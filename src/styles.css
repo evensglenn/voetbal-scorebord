@@ -2218,36 +2218,78 @@ input:focus-visible {
 }
 
 .update-toast {
+  /* Bovenaan, over de titelbalk die in elk thema donker is: daarom altijd
+     een licht vlak, in licht en donker thema, zodat de melding opvalt. */
   position: fixed;
   z-index: 9;
-  left: 50%;
-  bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
+  top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 0.75rem;
+  gap: 0.75rem;
   width: min(calc(100% - 2rem), 26rem);
-  padding: 0.7rem 0.7rem 0.7rem 1rem;
-  background: var(--bar);
-  color: var(--on-bar);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(17, 22, 27, 0.35);
-  font-size: 0.95rem;
-  animation: dialog-in 180ms ease-out;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  background: #ffffff;
+  color: #11161b;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  font-size: 0.9rem;
+  animation: toast-down 220ms ease-out;
 }
-
-/* Op het donkere startscherm omgekeerd, anders valt de melding weg. */
-.shell.is-home .update-toast {
-  background: var(--on-bar);
-  color: var(--bar);
+@keyframes toast-down {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
 }
-
-.update-toast .btn {
-  flex: 0 0 auto;
-  min-height: 2.25rem;
-  padding: 0.4rem 0.8rem;
+.update-toast-icon {
+  display: flex;
+  flex: none;
+  color: var(--club);
+}
+.update-toast-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.update-toast-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.update-toast-text span {
+  opacity: 0.7;
+}
+.update-toast .update-toast-go {
+  flex: none;
+  min-height: 2.5rem;
+  padding: 0.4rem 1rem;
+  /* Zelfde diepere oranje als de startknop: wit haalt zo genoeg contrast. */
+  background: #c4510a;
+  border-color: #c4510a;
+  color: var(--on-accent);
+  font-weight: 700;
+}
+.update-toast-close {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.update-toast-close:hover {
+  opacity: 1;
 }
 
 @keyframes overlay-in {
