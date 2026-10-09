@@ -752,10 +752,14 @@ export default function App() {
             {/* Tijdens de strafschoppen spelen klok en periodes geen rol meer. */}
             {!penaltiesShown && (
               <section className="clockbar">
-                <PeriodProgress count={PERIODS.length} period={match.period} progress={periodProgress} />
+                <PeriodProgress
+                  count={PERIODS.length}
+                  period={match.period}
+                  progress={periodProgress}
+                  labelled
+                />
                 <div className="clock">
                   <div className="clock-readout">
-                    <span className="clock-label">Periode {match.period}</span>
                     <span className={timeUp ? 'clock-num is-timeup' : 'clock-num'}>
                       {mmss(Math.min(clock, periodSeconds))}
                       {extraSeconds > 0 && <span className="clock-extra">+{mmss(extraSeconds)}</span>}

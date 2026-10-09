@@ -180,14 +180,14 @@ body {
   color: var(--club);
 }
 
+/* Elke ploeg gecentreerd in haar eigen helft van het veld, met de naam
+   recht boven de score, zoals op het grote scorebord. */
 .side {
   display: flex;
   flex-direction: column;
+  align-items: center;
   min-width: 0;
-}
-
-.side-right {
-  align-items: flex-end;
+  text-align: center;
 }
 
 .team-name {
@@ -428,6 +428,30 @@ body {
   }
 }
 
+/* Wedstrijdscherm: het label van de lopende periode staat boven haar
+   segment, zodat de klok eronder de plaats van het oude label krijgt. */
+.period-col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.period-progress.is-labelled .period-seg {
+  flex: none;
+}
+.period-label {
+  min-height: 1em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+  /* Mag over het volgende (lege) label lopen bij veel periodes. */
+  white-space: nowrap;
+  color: var(--club);
+}
+
 .periods {
   display: flex;
   gap: 0.35rem;
@@ -467,18 +491,11 @@ body {
   min-width: 0;
 }
 
-.clock-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
 .clock-num {
-  font-size: 2rem;
+  /* Het periodelabel staat in de voortgangsbalk; de klok krijgt die plaats. */
+  font-size: 2.75rem;
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 1;
   min-width: 4.5rem;
 }
 
@@ -695,7 +712,7 @@ body {
 
   .clock-num {
     min-width: 3.6rem;
-    font-size: 1.8rem;
+    font-size: 2.5rem;
   }
 
   .clock-extra {
@@ -2550,7 +2567,7 @@ input:focus-visible {
   }
 
   .clock-num {
-    font-size: 1.65rem;
+    font-size: 2.1rem;
   }
 
   .clock-extra {
@@ -3035,11 +3052,7 @@ input:focus-visible {
 }
 
 .side .goals.is-pop {
-  transform-origin: left center;
-}
-
-.side-right .goals.is-pop {
-  transform-origin: right center;
+  transform-origin: center;
 }
 
 .tl-row {
@@ -3538,8 +3551,9 @@ input:focus-visible {
 }
 
 /* Lokaal draaien (zie EnvBadge): groen met testdata, rood tegen de echte
-   gegevens. Klein bovenaan in het midden, boven alles, en niet aanklikbaar
-   zodat het nooit een knop in de weg zit. */
+   gegevens. Klein bovenaan in het midden, boven alles (ook over tekst: zo
+   valt het het best op), en niet aanklikbaar zodat het nooit een knop in de
+   weg zit. */
 .env-badge {
   position: fixed;
   z-index: 100;
