@@ -7,10 +7,22 @@ internet nodig zodra de pagina één keer geladen is.
 
 ## Lokaal draaien
 
+Aanbevolen: tegen de Firebase-emulators, met testdata en los van je echte gegevens.
+
 ```bash
 npm install
-npm run dev
+npm run dev:local
 ```
+
+Open http://localhost:5181, klik op **Inloggen met Google** en kies **Test** in het venster
+van de emulator. Je krijgt twee ploegen (U9 en U7), twaalf gespeelde wedstrijden en twee
+back-ups; alles wat je doet blijft in de emulator en is weg na het stoppen (Ctrl+C).
+
+Vereist **Java 21+** voor de emulators (`brew install openjdk@21`; het script vindt de
+Homebrew-installatie ook zonder PATH-aanpassing).
+
+`npm run dev` (http://localhost:5173) start de app tegen de **echte** database: handig om
+iets na te kijken, maar elke wijziging is echt.
 
 ## Op GitHub Pages zetten
 

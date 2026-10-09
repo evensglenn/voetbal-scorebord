@@ -8,3 +8,6 @@ dist
 _bmad/
 _bmad-output/
 .claude/skills/
+
+# Firebase-emulators
+*-debug.log

@@ -3,6 +3,7 @@
 // snel opent als vroeger.
 import { initializeApp } from 'firebase/app'
 import {
+  connectAuthEmulator,
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -12,6 +13,7 @@ import {
 } from 'firebase/auth'
 import {
   collection,
+  connectFirestoreEmulator,
   deleteDoc,
   doc,
   getDocs,
@@ -29,6 +31,12 @@ const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
 auth.languageCode = 'nl'
 const db = getFirestore(app)
+
+// Lokaal tegen de Firebase-emulators met testdata (npm run dev:local).
+if (import.meta.env.VITE_USE_EMULATORS === 'true') {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
+  connectFirestoreEmulator(db, '127.0.0.1', 8080)
+}
 
 // Firestore bewaart een document tot 1 MiB; hou wat marge.
 const MAX_SIZE = 1_000_000
