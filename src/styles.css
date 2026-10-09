@@ -12,6 +12,8 @@
   --club: #e4600a;
   --away: #59646f;
   --danger: #d1332c;
+  /* Waarschuwing als tekst: dieper dan de clubkleur, voor genoeg contrast. */
+  --warn: #b04a08;
   --success: #1a7a3c;
   --muted: #586269;
   --line: rgba(17, 22, 27, 0.16);
@@ -33,6 +35,7 @@
     --paper: #1a2027;
     --away: #6d7883;
     --danger: #e2483f;
+    --warn: #f08a3e;
     --success: #2a9a52;
     --muted: #9aa4ad;
     --line: rgba(255, 255, 255, 0.15);
@@ -49,6 +52,7 @@
   --paper: #1a2027;
   --away: #6d7883;
   --danger: #e2483f;
+  --warn: #f08a3e;
   --success: #2a9a52;
   --muted: #9aa4ad;
   --line: rgba(255, 255, 255, 0.15);
@@ -273,6 +277,7 @@ body {
 }
 
 .tab {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -295,6 +300,18 @@ body {
 .tab svg {
   width: 24px;
   height: 24px;
+}
+
+/* Stipje op een tab die aandacht vraagt (bv. account bijna vol). */
+.tab-dot {
+  position: absolute;
+  top: 0.45rem;
+  left: calc(50% + 0.45rem);
+  width: 0.55rem;
+  height: 0.55rem;
+  background: var(--warn);
+  border: 2px solid var(--tabbar);
+  border-radius: 50%;
 }
 
 /* Enkel iconen; het label verschijnt alleen onder de actieve tab. Het blijft
@@ -3486,4 +3503,61 @@ input:focus-visible {
 }
 .backup-last.is-error {
   color: var(--danger);
+}
+/* Plaats gebruikt in het account */
+.storage {
+  margin-top: 0.75rem;
+}
+.storage-bar {
+  position: relative;
+  height: 0.4rem;
+  overflow: hidden;
+  background: var(--line-soft);
+  border-radius: 999px;
+}
+.storage-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  /* Altijd een sprankje zichtbaar, ook bij een paar kB. */
+  width: max(0.4rem, calc(var(--used) * 100%));
+  background: var(--muted);
+  border-radius: inherit;
+}
+.storage.is-warn .storage-bar::after {
+  background: var(--warn);
+}
+.storage.is-full .storage-bar::after {
+  background: var(--danger);
+}
+.storage .backup-note {
+  margin-top: 0.4rem;
+}
+.backup-note.is-warn {
+  color: var(--warn);
+}
+
+/* Lokaal draaien (zie EnvBadge): groen met testdata, rood tegen de echte
+   gegevens. Klein bovenaan in het midden, boven alles, en niet aanklikbaar
+   zodat het nooit een knop in de weg zit. */
+.env-badge {
+  position: fixed;
+  z-index: 100;
+  top: calc(0.3rem + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.15rem 0.6rem;
+  background: #1a7a3c;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.env-badge.is-real {
+  background: #c62828;
 }
