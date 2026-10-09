@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBytes, MAX_STATE_BYTES, stateBytes, storageLevel, storageUsage } from './storage.js'
+import { formatShare, MAX_STATE_BYTES, stateBytes, storageLevel, storageUsage } from './storage.js'
 
 const state = (matches, size = 100) => ({
   teams: [{ id: 't1', players: [] }],
@@ -38,9 +38,9 @@ describe('storage', () => {
     expect(usage.matchesLeft).toBe(Math.floor((MAX_STATE_BYTES - usage.bytes) / 2000))
   })
 
-  it('toont kB en MB leesbaar', () => {
-    expect(formatBytes(120)).toBe('1 kB')
-    expect(formatBytes(38_400)).toBe('38 kB')
-    expect(formatBytes(1_000_000)).toBe('1,0 MB')
+  it('toont het gebruik als percentage', () => {
+    expect(formatShare(0.001)).toBe('minder dan 1%')
+    expect(formatShare(0.038)).toBe('4%')
+    expect(formatShare(1)).toBe('100%')
   })
 })
