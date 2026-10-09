@@ -1845,16 +1845,16 @@ input:focus-visible {
    een marge in % rekent ook met de breedte, en zo volgt het knopje de cirkel
    op elke schermbreedte. */
 .board-expand {
+  /* Rechtsonder in de titelbalk: de scores staan in het midden van elke
+     helft, dus die hoek is vrij. */
   position: absolute;
   z-index: 2;
-  left: 50%;
-  top: 50%;
+  right: 0.35rem;
+  bottom: 0.35rem;
   display: grid;
   place-items: center;
   width: 2.5rem;
   height: 2.5rem;
-  /* Icoon (18px, gecentreerd) begint zo een paar pixels onder de cirkel. */
-  margin-top: calc(8.243% - 7px);
   padding: 0;
   /* Geen rand of vlak: het veld eromheen is al kader genoeg. */
   background: none;
@@ -1862,7 +1862,6 @@ input:focus-visible {
   border-radius: 50%;
   color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
-  transform: translateX(-50%);
   transition: color 150ms ease;
 }
 
@@ -1870,10 +1869,10 @@ input:focus-visible {
   color: var(--on-bar);
 }
 
-/* Ingeklapt scorebord: de cirkel valt er onder weg, dan in het midden. */
+/* Ingeklapt scorebord: verticaal in het midden, nog altijd rechts. */
 .board.is-compact .board-expand {
-  margin-top: 0;
-  transform: translate(-50%, -50%);
+  bottom: 50%;
+  transform: translateY(50%);
 }
 
 .bigboard-close {
