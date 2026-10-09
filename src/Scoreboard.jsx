@@ -105,7 +105,7 @@ export function Scoreboard({ started, home, score, opponentName, compact, onOpen
             {left.goals}
           </span>
         </div>
-        <div className="side side-right">
+        <div className="side">
           <span className={right.ours ? 'team-name team-name-ours' : 'team-name'}>{right.name}</span>
           <span
             key={right.goals}

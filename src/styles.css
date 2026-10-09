@@ -180,14 +180,14 @@ body {
   color: var(--club);
 }
 
+/* Elke ploeg gecentreerd in haar eigen helft van het veld, met de naam
+   recht boven de score, zoals op het grote scorebord. */
 .side {
   display: flex;
   flex-direction: column;
+  align-items: center;
   min-width: 0;
-}
-
-.side-right {
-  align-items: flex-end;
+  text-align: center;
 }
 
 .team-name {
@@ -3035,11 +3035,7 @@ input:focus-visible {
 }
 
 .side .goals.is-pop {
-  transform-origin: left center;
-}
-
-.side-right .goals.is-pop {
-  transform-origin: right center;
+  transform-origin: center;
 }
 
 .tl-row {
@@ -3538,12 +3534,13 @@ input:focus-visible {
 }
 
 /* Lokaal draaien (zie EnvBadge): groen met testdata, rood tegen de echte
-   gegevens. Klein bovenaan in het midden, boven alles, en niet aanklikbaar
-   zodat het nooit een knop in de weg zit. */
+   gegevens. Klein onderaan in het midden, net boven de tabbalk (bovenaan
+   bedekte het de ploegnamen), boven alles, en niet aanklikbaar zodat het
+   nooit een knop in de weg zit. */
 .env-badge {
   position: fixed;
   z-index: 100;
-  top: calc(0.3rem + env(safe-area-inset-top, 0px));
+  bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   padding: 0.15rem 0.6rem;
