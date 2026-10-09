@@ -2943,6 +2943,41 @@ function teamStats(played) {
   }
 }
 
+const COUNT_MS = 700
+
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+// Telt een cijfer op vanaf nul (of vanaf de vorige waarde als het verandert),
+// snel in het begin en rustig uitbollend. Met "Beperk beweging" staat het
+// meteen op de eindwaarde.
+function CountUp({ value, decimals = 0 }) {
+  const [shown, setShown] = useState(() => (reducedMotion() ? value : 0))
+  const from = useRef(shown)
+
+  useEffect(() => {
+    if (reducedMotion()) {
+      from.current = value
+      setShown(value)
+      return
+    }
+    const begin = from.current
+    const start = performance.now()
+    let frame
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / COUNT_MS)
+      const v = begin + (value - begin) * (1 - (1 - t) ** 3)
+      from.current = v
+      setShown(v)
+      if (t < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [value])
+
+  // Math.round(-0,4) geeft -0; String() maakt daar gewoon "0" van.
+  return String(decimals ? shown.toFixed(decimals) : Math.round(shown)).replace('.', ',')
+}
+
 const scoreLine = (h) => `${ourGoals(h)}–${theirGoals(h)} tegen ${h.theirName}`
 
 function Stats({ teams, history, defaultTeamId }) {
@@ -2953,7 +2988,8 @@ function Stats({ teams, history, defaultTeamId }) {
   const played = playedBy(team, history)
   const st = teamStats(played)
   // Doelpunten als totaal of als gemiddelde per wedstrijd (één decimaal).
-  const goals = (v) => (goalsView === 'avg' ? (v / n).toFixed(1).replace('.', ',') : v)
+  const goals = (v) =>
+    goalsView === 'avg' ? <CountUp value={v / n} decimals={1} /> : <CountUp value={v} />
   const shootoutCount = st.shootouts.won + st.shootouts.drawn + st.shootouts.lost
   const rate = (p) => p.scored / p.total
   const takers = [...st.takers].sort((a, b) =>
@@ -2962,6 +2998,8 @@ function Stats({ teams, history, defaultTeamId }) {
       : b.scored - a.scored || rate(b) - rate(a) || a.name.localeCompare(b.name),
   )
   const n = played.length
+  // De balk achter elke schutter is relatief tegenover de topschutter.
+  const topGoals = Math.max(1, ...st.scorers.map((p) => p.goals))
 
   return (
     <section className="pane-stats">
@@ -2994,19 +3032,19 @@ function Stats({ teams, history, defaultTeamId }) {
             <h2 className="section-title">Resultaten</h2>
             <div className="stat-tiles">
               <div className="stat-tile">
-                <strong>{n}</strong>
+                <strong><CountUp value={n} /></strong>
                 <span>{n === 1 ? 'wedstrijd' : 'wedstrijden'}</span>
               </div>
               <div className="stat-tile is-w">
-                <strong>{st.record.W}</strong>
+                <strong><CountUp value={st.record.W} /></strong>
                 <span>gewonnen</span>
               </div>
               <div className="stat-tile is-g">
-                <strong>{st.record.G}</strong>
+                <strong><CountUp value={st.record.G} /></strong>
                 <span>gelijk</span>
               </div>
               <div className="stat-tile is-v">
-                <strong>{st.record.V}</strong>
+                <strong><CountUp value={st.record.V} /></strong>
                 <span>verloren</span>
               </div>
             </div>
@@ -3099,7 +3137,7 @@ function Stats({ teams, history, defaultTeamId }) {
             ) : (
               <ol className="stat-card stat-rank">
                 {st.scorers.map((p, i) => (
-                  <li key={p.name}>
+                  <li key={p.name} style={{ '--share': p.goals / topGoals }}>
                     <span className="stat-rank-pos">{i + 1}</span>
                     <span className="stat-rank-name">
                       {p.name}
@@ -3109,7 +3147,9 @@ function Stats({ teams, history, defaultTeamId }) {
                           ` · ${p.hattricks} ${p.hattricks === 1 ? 'hattrick' : 'hattricks'}`}
                       </small>
                     </span>
-                    <span className="stat-rank-value">{p.goals}</span>
+                    <span className="stat-rank-value">
+                      <CountUp value={p.goals} />
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -3120,19 +3160,19 @@ function Stats({ teams, history, defaultTeamId }) {
                 <h2 className="section-title">Strafschoppen</h2>
                 <div className="stat-tiles">
                   <div className="stat-tile">
-                    <strong>{shootoutCount}</strong>
+                    <strong><CountUp value={shootoutCount} /></strong>
                     <span>{shootoutCount === 1 ? 'reeks' : 'reeksen'}</span>
                   </div>
                   <div className="stat-tile is-w">
-                    <strong>{st.shootouts.won}</strong>
+                    <strong><CountUp value={st.shootouts.won} /></strong>
                     <span>gewonnen</span>
                   </div>
                   <div className="stat-tile is-g">
-                    <strong>{st.shootouts.drawn}</strong>
+                    <strong><CountUp value={st.shootouts.drawn} /></strong>
                     <span>gelijk</span>
                   </div>
                   <div className="stat-tile is-v">
-                    <strong>{st.shootouts.lost}</strong>
+                    <strong><CountUp value={st.shootouts.lost} /></strong>
                     <span>verloren</span>
                   </div>
                 </div>
@@ -3157,14 +3197,14 @@ function Stats({ teams, history, defaultTeamId }) {
                 </div>
                 <ol key={penaltySort} className="stat-card stat-rank">
                   {takers.map((p, i) => (
-                    <li key={p.name}>
+                    <li key={p.name} style={{ '--share': rate(p) }}>
                       <span className="stat-rank-pos">{i + 1}</span>
                       <span className="stat-rank-name">
                         {p.name}
                         <small>{Math.round((p.scored / p.total) * 100)}% raak</small>
                       </span>
                       <span className="stat-rank-value">
-                        {p.scored}
+                        <CountUp value={p.scored} />
                         <span className="stat-rank-of">/{p.total}</span>
                       </span>
                     </li>

@@ -2696,6 +2696,26 @@ input:focus-visible {
   text-align: right;
 }
 
+.stat-rank {
+  overflow: hidden;
+}
+
+/* Balk achter de rij: aandeel tegenover de topschutter, of het % raak. */
+.stat-rank li {
+  position: relative;
+  isolation: isolate;
+}
+
+.stat-rank li::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  width: calc(var(--share, 0) * 100%);
+  background: rgba(228, 96, 10, 0.09);
+  transform-origin: left center;
+}
+
 .stat-rank-pos {
   display: inline-grid;
   place-items: center;
@@ -2883,6 +2903,42 @@ input:focus-visible {
   animation-delay: 160ms;
 }
 
+/* Rijen in lijsten schuiven na elkaar binnen, de balken groeien mee. */
+.stat-list li,
+.stat-rank li {
+  animation: slide-in 280ms ease-out backwards;
+}
+
+.stat-rank li::before {
+  animation: grow-x 700ms cubic-bezier(0.2, 0.7, 0.2, 1) 150ms backwards;
+}
+
+.stat-list li:nth-child(2),
+.stat-rank li:nth-child(2) {
+  animation-delay: 50ms;
+}
+
+.stat-list li:nth-child(3),
+.stat-rank li:nth-child(3) {
+  animation-delay: 100ms;
+}
+
+.stat-list li:nth-child(4),
+.stat-rank li:nth-child(4) {
+  animation-delay: 150ms;
+}
+
+.stat-list li:nth-child(n + 5),
+.stat-rank li:nth-child(n + 5) {
+  animation-delay: 200ms;
+}
+
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
 .form-dot {
   animation: pop 360ms ease-out backwards;
 }
@@ -2939,6 +2995,9 @@ input:focus-visible {
   .pane-stats,
   .stat-tile,
   .stat-card,
+  .stat-list li,
+  .stat-rank li,
+  .stat-rank li::before,
   .history-list li,
   .squad li,
   .form-dot,
