@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyseRuns, buildSummary, emptyTeam, fromStored, normalizeTeam } from './App.jsx'
+import { analyseRuns, buildSummary, emptyTeam, fromStored, normalizeTeam } from './match.js'
 
 let n = 0
 const goal = (team, playerId = null, extra = {}) => ({ id: `e${++n}`, team, playerId, period: 1, clock: 0, ...extra })

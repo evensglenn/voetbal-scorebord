@@ -21,7 +21,7 @@ python3 tools/make_icons.py   # regenerate PNG icons in public/ (change CLUB col
 ```
 
 No linter or formatter is configured. Unit tests sit next to the code (`src/*.test.js`;
-`App.jsx` and `cloud.js` export their pure helpers for them), Firestore tests in
+`match.js`, `cloud.js` and `storage.js` hold the pure logic they test), Firestore tests in
 `src/firebase.emulator.test.js` (skipped without emulators), browser tests in `e2e/` with
 fixtures that create a fresh emulator account per test. Tests find elements by their
 visible Dutch labels, so update them when you rename UI text.
@@ -62,7 +62,15 @@ the owner fixes it with `sudo chown -R $(whoami) ~/.npm`).
 
 | Path | What it is |
 | --- | --- |
-| `src/App.jsx` | Almost the whole app (~4000 lines): state, all screens and components, icons |
+| `src/App.jsx` | The `App` component: state, clock, alerts, sync hook-up and which screen is open |
+| `src/match.js` | Pure domain: `AGE_CONFIG`, `emptyTeam`, `normalizeTeam`, `fromStored`, `load`, `analyseRuns`, `buildSummary`, `mmss`, … |
+| `src/results.js` | Pure results/stats helpers (`resultOf`, `playedBy`, `teamStats`, …) |
+| `src/device.js` | Speech, vibration, notifications, theme preference, device type, `reducedMotion` |
+| `src/ui.jsx` | Shared UI: `Presence`, `useModal`, `useDialog`, `Confirm`, `SwitchRow`, `NumberSelect` |
+| `src/icons.jsx` | All SVG icon components |
+| `src/Home.jsx`, `Match.jsx`, `Scoreboard.jsx`, `BigBoard.jsx`, `StartMatch.jsx`, `SummaryView.jsx` | Match screen parts: start screen, timeline/penalties, header board, landscape board, new-match dialog, summary dialog |
+| `src/Squad.jsx`, `History.jsx`, `Stats.jsx`, `Settings.jsx` | The other tabs (`Settings` also holds the backup file export/import) |
+| `src/Account.jsx` | Login screen, first-login choice, account card, storage meter, account backups |
 | `src/summary.js` | Canvas drawing of the shareable match summary image (`drawSummary`, `heightFor`) |
 | `src/cloud.js` | `useCloudSync`: optional sync of the whole state with Firebase (merge, retry, status) |
 | `src/firebase.js` | The only file that touches the Firebase SDK; dynamically imported by `cloud.js` |
@@ -86,7 +94,11 @@ the owner fixes it with `sudo chown -R $(whoami) ~/.npm`).
 `/` otherwise). Always build asset URLs with `import.meta.env.BASE_URL`; in `index.html`
 use `%BASE_URL%`.
 
-## App architecture (`src/App.jsx`)
+Each module exports what others need; there are no import cycles (only `App.jsx` imports
+the screens). New screens get their own file; pure logic goes into `match.js`/`results.js`
+so it can be unit-tested.
+
+## App architecture
 
 **State** lives in a single `useState(load)` in `App` and is persisted wholesale as JSON
 under `localStorage['matchblad.v1']` on every change:
@@ -184,6 +196,6 @@ over https (GitHub Pages), not on a plain-http test server.
 
 ## Notes
 
-- `README.md` (Dutch, user-facing) describes an earlier, smaller version (only U7/U9,
-  fewer screens). Trust the code over the README.
+- `README.md` is Dutch and written for the owner: features first, then development.
+  Keep it in sync when features change.
 - `dist/` is build output and git-ignored.
