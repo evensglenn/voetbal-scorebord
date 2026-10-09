@@ -11,3 +11,7 @@ _bmad-output/
 
 # Firebase-emulators
 *-debug.log
+
+# Playwright
+playwright-report/
+test-results/

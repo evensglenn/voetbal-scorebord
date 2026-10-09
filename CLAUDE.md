@@ -14,11 +14,32 @@ npm run dev:local # app against the Firebase emulators with test data (http://lo
 npm run dev       # Vite dev server against the REAL Firebase project (http://localhost:5173)
 npm run build     # stamps public/sw.js with the version, then vite build -> dist/
 npm run preview   # serve dist/
+npm test          # unit tests (Vitest)
+npm run test:emulator  # unit + Firestore tests (sync, backups, rules) against the emulators; reuses a running dev:local
+npm run test:e2e  # browser tests (Playwright, installed Chrome) at phone and desktop width; reuses a running dev:local
 python3 tools/make_icons.py   # regenerate PNG icons in public/ (change CLUB colour there)
 ```
 
-There are no tests, linter or formatter configured. Check changes by running the app
-(Playwright has been used ad hoc from a temp dir, not as a project dependency).
+No linter or formatter is configured. Unit tests sit next to the code (`src/*.test.js`;
+`App.jsx` and `cloud.js` export their pure helpers for them), Firestore tests in
+`src/firebase.emulator.test.js` (skipped without emulators), browser tests in `e2e/` with
+fixtures that create a fresh emulator account per test. Tests find elements by their
+visible Dutch labels, so update them when you rename UI text.
+
+## Workflow
+
+1. Branch from an up-to-date `main` (`fix/…`, `feat/…`, `chore/…`). Never commit to
+   `main` directly; it is protected against force-push and deletion.
+2. Make the change, bump the version (see below), run `npm run test:emulator`,
+   `npm run test:e2e` and `npm run build`, and look at the result in `npm run dev:local`.
+3. Ask before committing. Then push the branch and open a PR (summary + testing).
+4. `.github/workflows/ci.yml` runs build, unit, Firestore and browser tests on the PR.
+   Merge (`gh pr merge --merge`) only when it is green and the owner agrees.
+5. A push to `main` deploys: first the Firestore rules (needs the repo secret
+   `FIREBASE_SERVICE_ACCOUNT`), then the app to GitHub Pages. Watch the run.
+
+While `~/.npm` has root-owned files, run npm with `--cache` pointing to a temp dir (or
+the owner fixes it with `sudo chown -R $(whoami) ~/.npm`).
 
 ## Conventions
 
@@ -46,7 +67,7 @@ There are no tests, linter or formatter configured. Check changes by running the
 | `src/cloud.js` | `useCloudSync`: optional sync of the whole state with Firebase (merge, retry, status) |
 | `src/firebase.js` | The only file that touches the Firebase SDK; dynamically imported by `cloud.js` |
 | `src/firebase-config.js` | Public Firebase web config; empty `apiKey` = feature hidden |
-| `firestore.rules` | Firestore security rules (paste into the Firebase console) |
+| `firestore.rules` | Firestore security rules (deployed automatically on push to `main`) |
 | `firebase.json`, `scripts/emulators.mjs`, `scripts/seed-emulator.mjs` | `dev:local`: Auth + Firestore emulators, seeded with a "Test" account, 2 teams, 12 matches, 2 backups |
 | `src/main.jsx` | React root + service worker registration and update detection |
 | `src/styles.css` | All styles (~3300 lines), theme tokens on `:root` |
@@ -54,7 +75,9 @@ There are no tests, linter or formatter configured. Check changes by running the
 | `public/manifest.webmanifest`, icons, `club-logo.png` | PWA assets |
 | `scripts/stamp-sw.js` | Pre-build: writes the package version into `sw.js` |
 | `index.html` | Sets the saved theme before React mounts (no flash), loads Google Font *Barlow Semi Condensed* |
-| `.github/workflows/deploy.yml` | Build and deploy to GitHub Pages on push to `main` |
+| `.github/workflows/deploy.yml` | On push to `main`: deploy `firestore.rules`, then build and deploy to GitHub Pages |
+| `.github/workflows/ci.yml` | On every PR: build, unit, Firestore and browser tests |
+| `vitest.config.js`, `playwright.config.js`, `e2e/` | Test setup (see Workflow) |
 | `_bmad/`, `_bmad-output/`, `.claude/skills/` | Local BMAD tooling, git-ignored; not part of the app |
 
 `vite.config.js` derives `base` from `GITHUB_REPOSITORY` (`/<repo>/` for project pages,

@@ -1,3 +1,4 @@
+# Zet eerst de Firestore-regels online en daarna de app op GitHub Pages.
 name: Deploy naar GitHub Pages
 
 on:
@@ -12,16 +13,38 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  build:
+  # De app verwacht de bijhorende regels, dus die gaan eerst; mislukt dit, dan
+  # gaat de app ook niet online.
+  firestore:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - name: Check credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Repository secret FIREBASE_SERVICE_ACCOUNT ontbreekt (JSON-sleutel van een serviceaccount, zie README)."
+            exit 1
+          fi
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
         with:
-          node-version: 20
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy Firestore rules
+        run: npx --yes firebase-tools@15 deploy --only firestore:rules --project voetbal-scorebord-6eb7f --non-interactive
+
+  build:
+    needs: firestore
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run build

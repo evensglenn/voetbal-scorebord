@@ -24,6 +24,32 @@ Homebrew-installatie ook zonder PATH-aanpassing).
 `npm run dev` (http://localhost:5173) start de app tegen de **echte** database: handig om
 iets na te kijken, maar elke wijziging is echt.
 
+## Tests
+
+```bash
+npm test               # unit-tests
+npm run test:emulator  # ook de Firestore-tests (opslaan, back-ups, regels) tegen de emulators
+npm run test:e2e       # browsertests (Playwright, met je geïnstalleerde Chrome) op gsm- en desktopbreedte
+```
+
+Beide emulatortests gebruiken een draaiende `npm run dev:local` als die er is. Elke pull
+request draait alle tests in GitHub Actions ([ci.yml](.github/workflows/ci.yml)); werk dus
+op een branch en merge pas als de controle groen is.
+
+## Deploy
+
+Een push naar `main` zet eerst de Firestore-regels (`firestore.rules`) online en daarna de
+app op GitHub Pages. Voor de regels heeft GitHub een sleutel nodig:
+
+1. Open in de [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts?project=voetbal-scorebord-6eb7f)
+   het project `voetbal-scorebord-6eb7f` → **Service accounts** → **Create service account**
+   (bv. `github-firestore-deploy`).
+2. Geef het de rollen **Firebase Rules Admin** en **Service Usage Consumer**.
+3. Open het service account → **Keys** → **Add key** → **JSON** en download het bestand.
+4. Zet de inhoud als repository secret `FIREBASE_SERVICE_ACCOUNT`: GitHub → **Settings** →
+   **Secrets and variables** → **Actions**, of
+   `gh secret set FIREBASE_SERVICE_ACCOUNT < key.json`. Verwijder daarna het bestand.
+
 ## Op GitHub Pages zetten
 
 1. Maak een lege repository op GitHub en push deze map naar de `main`-branch.
