@@ -63,6 +63,9 @@ import { Stats } from './Stats.jsx'
 import { History } from './History.jsx'
 import { SubSettings, StartMatch } from './StartMatch.jsx'
 
+// Volgorde van de tabs onderaan; bepaalt waar het streepje van de actieve tab staat.
+const TAB_ORDER = ['match', 'squad', 'history', 'stats', 'settings']
+
 export default function App() {
   const [state, setState] = useState(load)
   const cloud = useCloudSync(state, setState, { fromStored, freshState })
@@ -691,6 +694,15 @@ export default function App() {
       )}
 
       <nav className="tabs">
+        {/* Streepje boven de actieve tab. De key herstart het uitrekken bij
+            elke wissel; de positie zelf glijdt via een CSS-transitie. */}
+        <span
+          className={screen === 'match' && match.started ? 'tab-indicator is-live' : 'tab-indicator'}
+          style={{ '--tab-index': TAB_ORDER.indexOf(screen) }}
+          aria-hidden="true"
+        >
+          <span key={screen} />
+        </span>
         {/* Zonder wedstrijd is dit "Start"; tijdens een wedstrijd wordt het
             een rood "Live", en zolang de klok loopt pulseert het icoon. */}
         <button
