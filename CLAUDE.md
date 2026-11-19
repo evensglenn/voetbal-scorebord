@@ -1,5 +1,10 @@
 # CLAUDE.md
 
+> **The app has been discontinued (v0.93.0).** `src/main.jsx` renders `Farewell`
+> (`src/Farewell.jsx`) instead of `App`: a farewell screen asking users to remove the app, no
+> sign-in and no sync. The rest of the code is kept so the change is easy to revert; the
+> old browser tests were removed (see git history) and `e2e/farewell.spec.js` replaces them.
+
 Matchblad / "Scorebord": an offline-first PWA for tracking a youth football match from the
 sideline (score, goalscorers, timeline, period clock, substitutions, penalty shoot-out,
 match history and stats) for the club **Lummen United**. Everything runs in the browser and

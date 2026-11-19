@@ -3526,6 +3526,12 @@ input:focus-visible {
   color: #ffb4a8;
 }
 
+/* Afscheidsscherm: enkel de tekst, midden op het scherm. */
+.home-hero-farewell .home-hero-sub {
+  max-width: 24rem;
+  margin: auto 0;
+}
+
 /* Kopieën in het account */
 .backup-list {
   margin: 0.6rem 0 0.75rem;
