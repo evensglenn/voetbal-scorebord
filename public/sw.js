@@ -1,19 +1,52 @@
-// Houdt de app bruikbaar aan de zijlijn, ook als het netwerk daar niets waard is.
-// Pagina's en onveranderlijk-benoemde bestanden (manifest, iconen, favicon):
-// eerst het netwerk, met de cache als vangnet — zo komen naamswijzigingen (zoals
-// het manifest) altijd door. Enkel de gehashte build-bestanden onder /assets/
-// (hun naam verandert zodra de inhoud verandert) mogen veilig eerst uit de cache.
+// Het Scorebord stopt. Deze service worker zorgt dat zoveel mogelijk
+// toestellen het afscheidsscherm krijgen en de oude app niet meer bruikbaar is:
+// - bij installeren gaat het afscheidsscherm (de pagina en zijn gehashte
+//   bestanden) meteen in de cache, zodat het ook zonder bereik opent;
+// - bij activeren worden de oude caches gewist en elk open venster van de app
+//   opnieuw geladen, ook een oude versie die nog openstond (en waarvan de
+//   melding "nieuwe versie" weggeklikt kon worden).
+// Pagina's komen verder eerst van het netwerk, met de cache als vangnet.
 
-const CACHE = 'scorebord-v0.92.2'
+const CACHE = 'scorebord-v0.93.0'
 
-self.addEventListener('install', () => self.skipWaiting())
+// De bestanden onder /assets/ die de pagina laadt (script en stijlen).
+const assetsOf = (html) =>
+  [...html.matchAll(/(?:src|href)="([^"]*\/assets\/[^"]+)"/g)].map((m) => m[1])
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting()
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then(async (cache) => {
+        const response = await fetch('./', { cache: 'no-cache' })
+        if (!response.ok) return
+        const html = await response.clone().text()
+        await cache.put('./', response)
+        await cache.addAll(assetsOf(html))
+      })
+      // Mislukt het vooraf bewaren, dan gaat de installatie toch door: online
+      // komt het afscheidsscherm dan gewoon van het netwerk.
+      .catch(() => {}),
+  )
+})
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+    caches.keys().then(async (keys) => {
+      const old = keys.filter((k) => k !== CACHE)
+      await Promise.all(old.map((k) => caches.delete(k)))
+      await self.clients.claim()
+      // Stond er een oudere versie op dit toestel, dan elk open venster
+      // opnieuw laden, zodat ook een oude app die nog openstond meteen het
+      // afscheidsscherm toont. Niet afwachten: het herladen heeft deze
+      // service worker nodig, en die is pas klaar als activeren gedaan is.
+      if (old.length) {
+        self.clients
+          .matchAll({ type: 'window' })
+          .then((windows) => windows.forEach((client) => client.navigate(client.url).catch(() => {})))
+      }
+    }),
   )
 })
 

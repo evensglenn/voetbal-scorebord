@@ -6,6 +6,13 @@ web-app die je op je gsm zet, met je gegevens in je Google-account en op al je t
 
 **Open de app:** <https://evensglenn.github.io/voetbal-scorebord/>
 
+> **De app is gestopt (versie 0.93.0).** Wie ze opent, krijgt enkel nog een afscheidsscherm
+> met de vraag om de app van het toestel te verwijderen. Er wordt niet meer ingelogd of
+> gesynchroniseerd. Het scherm staat in `src/Farewell.jsx`; `src/main.jsx` toont het in
+> plaats van `App`. De rest van de code staat er nog, dus terugdraaien is die ene regel
+> in `main.jsx` (plus de browsertests uit de git-geschiedenis). De online gegevens in het
+> Firebase-project worden met de hand opgeruimd.
+
 ## Wat de app kan
 
 - **Ploegen en spelers.** Eén of meer ploegen, van U6 tot U21. Per leeftijd staat het
